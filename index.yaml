@@ -1,0 +1,23 @@
+apiVersion: v1
+entries:
+  arr:
+  - apiVersion: v2
+    created: "2024-04-13T18:21:53.609611432Z"
+    description: A Helm chart for applications like Sonarr, Radarr, etc.
+    digest: 424666b754b7f667efbe6b47bcd22c0388e4bf77bd1cce4c4936813ccf23eb9c
+    name: arr
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/arr-0.1.0/arr-0.1.0.tgz
+    version: 0.1.0
+  transmission:
+  - apiVersion: v2
+    created: "2024-04-13T18:21:53.713084719Z"
+    description: A Fast, Easy and Free Bittorrent Client
+    digest: 6d50cbaf7cf0d824e59ecd359d4da380fbfa96f4c7570c9695f9405e758b7ec4
+    name: transmission
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/transmission-0.1.0/transmission-0.1.0.tgz
+    version: 0.1.0
+generated: "2024-04-13T18:21:53.713093205Z"
