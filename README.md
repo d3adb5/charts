@@ -1,21 +1,14 @@
-# App of Apps
+# Helm Charts
 
-This repository contains the root application responsible for deploying all
-other applications in my private Kubernetes cluster through Argo CD. It
-implements the Argo CD App-of-Apps pattern.
+This repository contains Helm charts written by yours truly, usually for
+applications that lack an officially or (widely adopted) community supported
+chart.
 
-## Helm Charts & OLM
+The hope for this repository is to provide charts that can be used in production
+environments. When there is not an official container image, these charts will
+pick a [LinuxServer](https://linuxserver.io) image, as they are well maintained
+and have a good reputation.
 
-Some applications that are deployed through this repository do not have
-officially supported Helm charts. In these cases, I have created my own. Some
-applications are deployed through the Operator Lifecycle Manager (OLM) instead,
-and in this repository they are added as `Subscription` resources.
-
-## CI/CD
-
-There is limited opportunity for CI/CD in this repository as it exists today.
-Where applicable, ephemeral environments may be created through Argo's
-`ApplicationSet` resource, which has support for GitHub merge requests. To show
-differences in how applications will turn out, a workflow was added to run
-`argocd app diff` for the root application, with plans to expand to all
-applications that are being modified in the future.
+If you find any of these charts useful and have changes you'd like to see, feel
+free to submit an issue or a pull request. Additionally, consider these to be
+public domain.
