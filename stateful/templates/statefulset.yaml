@@ -4,21 +4,21 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "x-arr.fullname" . }}
+  name: {{ include "stateful.fullname" . }}
   labels:
-    {{- include "x-arr.labels" . | nindent 4 }}
+    {{- include "stateful.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "x-arr.fullname" . }}
+  serviceName: {{ include "stateful.fullname" . }}
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "x-arr.selectorLabels" . | nindent 6 }}
+      {{- include "stateful.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
         {{- toYaml .Values.podAnnotations | nindent 8 }}
       labels:
-        {{- include "x-arr.labels" . | nindent 8 }}
+        {{- include "stateful.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

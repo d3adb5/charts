@@ -1,0 +1,5 @@
+apiVersion: v2
+name: stateful
+description: A generic chart for stateful Web applications (e.g. Radarr)
+version: 1.0.0
+type: application
