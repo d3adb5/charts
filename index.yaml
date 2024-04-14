@@ -10,6 +10,16 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/arr-0.1.0/arr-0.1.0.tgz
     version: 0.1.0
+  stateful:
+  - apiVersion: v2
+    created: "2024-04-14T01:41:12.277850294Z"
+    description: A generic chart for stateful Web applications (e.g. Radarr)
+    digest: 966a472cafd8871cce28d6b0117406d22d9ed6dea834d27fbc4fd0b65a3ba14f
+    name: stateful
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/stateful-1.0.0/stateful-1.0.0.tgz
+    version: 1.0.0
   transmission:
   - apiVersion: v2
     created: "2024-04-13T18:21:53.713084719Z"
@@ -20,4 +30,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/transmission-0.1.0/transmission-0.1.0.tgz
     version: 0.1.0
-generated: "2024-04-13T18:21:53.713093205Z"
+generated: "2024-04-14T01:41:12.421801232Z"
