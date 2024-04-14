@@ -44,8 +44,6 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - name: arr-config
-              mountPath: /config
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -58,11 +56,6 @@ spec:
       tolerations:
         {{- toYaml .Values.tolerations | nindent 8 }}
   volumeClaimTemplates:
-    - metadata:
-        name: arr-config
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        storageClassName: {{ .Values.persistence.config.storageClass }}
-        resources:
-          requests:
-            storage: {{ .Values.persistence.config.size }}
+    {{- with .Values.extraVolumeClaimTemplates }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}

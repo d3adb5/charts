@@ -5,10 +5,6 @@ image:
   pullPolicy: Always
   tag: ""
 
-persistence:
-  config:
-    size: 512Mi
-
 securityContext: {}
   # capabilities:
   #   drop:
@@ -67,6 +63,17 @@ extraVolumeMounts: []
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
+
+# Additional volumeClaimTemplates on the output StatefulSet definition.
+extraVolumeClaimTemplates: []
+# - metadata:
+#     name: foo
+#   spec:
+#     accessModes: [ "ReadWriteOnce" ]
+#     storageClassName: "foo"
+#     resources:
+#       requests:
+#         storage: 1Gi
 
 nodeSelector: {}
 tolerations: []
