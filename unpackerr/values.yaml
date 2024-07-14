@@ -1,0 +1,75 @@
+# --- WARNING ---
+# Unpackerr is not designed to scale horizontally. Increasing the replicaCount
+# might lead to issues. Use this if you want to scale down declaratively, but
+# scaling it up will just lead to issues.
+# --- WARNING ---
+replicaCount: 1
+
+image:
+  repository: golift/unpackerr
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+config:
+  # Configure Unpackerr using a config file instead of environment variables.
+  # Use this only if you have a complex configuration. All other settings under
+  # 'config' will be ignored if you use this.
+  file:
+    # If you have an existing secret with your config, name it here.
+    existingSecret: ""
+    # Secret key for your existing secret.
+    existingSecretKey: "unpackerr.conf"
+
+  # Configure Unpackerr using environment variables from an existing secret.
+  # All other settings under the 'config' section will be ignored if you use
+  # this.
+  env:
+    # If you have an existing secret with your environment variables, name it here.
+    existingSecret: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+livenessProbe: {}
+readinessProbe: {}
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
