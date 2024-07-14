@@ -54,8 +54,8 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
-livenessProbe: {}
-readinessProbe: {}
+livenessProbe:
+readinessProbe:
 
 # Additional volumes on the output Deployment definition.
 volumes: []
