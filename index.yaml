@@ -42,6 +42,16 @@ entries:
   unpackerr:
   - apiVersion: v2
     appVersion: "0.14"
+    created: "2024-07-14T20:17:49.744429265Z"
+    description: Extract downloads for Sonarr, Radarr, etc.
+    digest: b4f82b7d8c00a789ce015f2938edd2670b89333a7287dbcad1abf65da0f6af53
+    name: unpackerr
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.1/unpackerr-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v2
+    appVersion: "0.14"
     created: "2024-07-14T20:01:03.701858115Z"
     description: Extract downloads for Sonarr, Radarr, etc.
     digest: 90327594c01b5d629ab10977449f7fbe3e26dd20cdc17a2fa3e8414b98017b0f
@@ -50,4 +60,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2024-07-14T20:01:03.701869356Z"
+generated: "2024-07-14T20:17:49.744439774Z"
