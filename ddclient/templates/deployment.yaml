@@ -52,11 +52,13 @@ spec:
               value: {{ .Values.config.server }}
             - name: DDCLIENT_ZONE
               value: {{ .Values.config.zone }}
+            {{- if .Values.config.credentials.loginKey }}
             - name: DDCLIENT_LOGIN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.config.credentials.secretName }}
                   key: {{ .Values.config.credentials.loginKey }}
+            {{- end }}
             - name: DDCLIENT_PASSWORD
               valueFrom:
                 secretKeyRef:
