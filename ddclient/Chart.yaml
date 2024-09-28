@@ -1,0 +1,8 @@
+apiVersion: v2
+name: ddclient
+description: Update dynamic DNS entries for accounts on DynDNS services
+type: application
+
+version: 0.1.0
+
+appVersion: "3.11.2"

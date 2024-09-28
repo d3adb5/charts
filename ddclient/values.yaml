@@ -1,0 +1,63 @@
+# Usually only one replica is necessary. ddclient probably does not derive
+# benefit or drawbacks from multiple replicas.
+replicaCount: 1
+
+config:
+  daemonPeriod: 300
+  dynamicRecords:
+    - example.com
+  server: "" # members.dyndns.org
+  zone: "" # example.com
+  protocol: "" # dyndns2
+  credentials:
+    secretName: ddclient-credentials
+    loginKey: ""
+    passwordKey: password
+  template: |
+    daemon={{ .Values.config.daemonPeriod }}
+    ssl=yes
+    foreground=yes
+    verbose=yes
+    use=web, web=https://checkip.amazonaws.com
+    protocol_env=DDCLIENT_PROTOCOL
+    login_env=DDCLIENT_LOGIN
+    password_env=DDCLIENT_PASSWORD
+    zone_env=DDCLIENT_ZONE
+    server_env=DDCLIENT_SERVER
+    {{- range $domain := .Values.config.dynamicRecords }}
+    {{ . }}
+    {{- end }}
+
+image:
+  repository: ghcr.io/d3adb5/ddclient
+  pullPolicy: IfNotPresent
+  tag: 3.11.2
+
+imagePullSecrets: []
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  privileged: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
