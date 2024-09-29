@@ -17,7 +17,7 @@ config:
     daemon={{ .Values.config.daemonPeriod }}
     ssl=yes
     foreground=yes
-    verbose=yes
+    verbose=no
     use=web, web=https://checkip.amazonaws.com
     protocol_env=DDCLIENT_PROTOCOL
     login_env=DDCLIENT_LOGIN
