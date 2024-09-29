@@ -20,10 +20,16 @@ config:
     verbose=no
     use=web, web=https://checkip.amazonaws.com
     protocol_env=DDCLIENT_PROTOCOL
+    {{- if .Values.config.server }}
     login_env=DDCLIENT_LOGIN
+    {{- end }}
     password_env=DDCLIENT_PASSWORD
+    {{- if .Values.config.zone }}
     zone_env=DDCLIENT_ZONE
+    {{- end }}
+    {{- if .Values.config.server }}
     server_env=DDCLIENT_SERVER
+    {{- end }}
     {{- range $domain := .Values.config.dynamicRecords }}
     {{ . }}
     {{- end }}
