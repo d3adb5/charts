@@ -72,6 +72,8 @@ spec:
               subPath: ddclient.conf
             - name: ddclient-cache
               mountPath: /var/cache/ddclient
+            - name: tmp
+              mountPath: /tmp
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -82,6 +84,8 @@ spec:
             items:
               - key: ddclient.conf
         - name: ddclient-cache
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
