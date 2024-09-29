@@ -10,6 +10,17 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/arr-0.1.0/arr-0.1.0.tgz
     version: 0.1.0
+  ddclient:
+  - apiVersion: v2
+    appVersion: 3.11.2
+    created: "2024-09-29T07:02:19.214154036Z"
+    description: Update dynamic DNS entries for accounts on DynDNS services
+    digest: b7b7b42da9bebbcfd04a34abf061fe8c0dcd40b57e2b88218312b3d0461d71c9
+    name: ddclient
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/ddclient-0.1.0/ddclient-0.1.0.tgz
+    version: 0.1.0
   stateful:
   - apiVersion: v2
     created: "2024-04-14T01:55:39.991205825Z"
@@ -60,4 +71,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2024-07-14T20:17:49.744439774Z"
+generated: "2024-09-29T07:02:19.214170446Z"
