@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ddclient.fullname" . }}
+  labels:
+    {{- include "ddclient.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ddclient.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "ddclient.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.runtimeClassName }}
+      runtimeClassName: {{ . }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- with .Values.image.args }}
+            {{- toYaml . | nindent 12 }}
+            {{- else }}
+            - "--foreground"
+            - "--file"
+            - "/config/ddclient.conf"
+            {{- end }}
+          env:
+            - name: DDCLIENT_PROTOCOL
+              value: {{ .Values.config.protocol }}
+            - name: DDCLIENT_SERVER
+              value: {{ .Values.config.server }}
+            - name: DDCLIENT_ZONE
+              value: {{ .Values.config.zone }}
+            {{- if .Values.config.credentials.loginKey }}
+            - name: DDCLIENT_LOGIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.credentials.secretName }}
+                  key: {{ .Values.config.credentials.loginKey }}
+            {{- end }}
+            - name: DDCLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.credentials.secretName }}
+                  key: {{ .Values.config.credentials.passwordKey }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: ddclient-configuration
+              mountPath: /config/ddclient.conf
+              subPath: ddclient.conf
+            - name: ddclient-cache
+              mountPath: /var/cache/ddclient
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: ddclient-configuration
+          configMap:
+            name: {{ include "ddclient.fullname" . }}
+        - name: ddclient-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
