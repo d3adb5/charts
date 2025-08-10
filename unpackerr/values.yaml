@@ -20,6 +20,9 @@ config:
     existingSecret: ""
     # Secret key for your existing secret.
     existingSecretKey: "unpackerr.conf"
+    # If you have deployed Sealed Secrets, you can place the encrypted
+    # configuration file here instead.
+    sealed: ""
 
   # Configure Unpackerr using environment variables from an existing secret.
   # All other settings under the 'config' section will be ignored if you use
@@ -27,6 +30,11 @@ config:
   env:
     # If you have an existing secret with your environment variables, name it here.
     existingSecret: ""
+    # If you have deployed Sealed Secrets, you can place encrypted values here
+    # instead.
+    sealed: {}
+      # Example:
+      # MY_ENV_VAR: "AgAAGQABhY2NvdW50X2lk..."
 
 imagePullSecrets: []
 nameOverride: ""
