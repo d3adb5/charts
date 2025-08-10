@@ -1,0 +1,79 @@
+suite: Deployment
+
+templates:
+  - deployment.yaml
+
+tests:
+  - it: mounts config file from sealed secret when given
+    release:
+      name: unpackerr
+    set:
+      config:
+        file:
+          sealed: "example"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: secret-config
+            secret:
+              secretName: unpackerr-config-file
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: secret-config
+            mountPath: /config
+            subPath: unpackerr.conf
+            readOnly: true
+
+  - it: mounts config file from existing secret when given
+    release:
+      name: unpackerr
+    set:
+      config:
+        file:
+          existingSecret: "example_secret"
+          existingSecretKey: "unpackerr.conf"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: secret-config
+            secret:
+              secretName: example_secret
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: secret-config
+            mountPath: /config
+            subPath: unpackerr.conf
+            readOnly: true
+
+  - it: grabs environment variables from sealed secret when given
+    release:
+      name: unpackerr
+    set:
+      config:
+        env:
+          sealed:
+            EXAMPLE_ENV: "example_value"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - secretRef:
+                name: unpackerr-env
+
+  - it: grabs environment variables from existing secret when given
+    release:
+      name: unpackerr
+    set:
+      config:
+        env:
+          existingSecret: "example_secret"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - secretRef:
+                name: example_secret
