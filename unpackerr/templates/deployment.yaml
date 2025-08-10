@@ -34,10 +34,14 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- with .Values.config.env.existingSecret }}
+          {{- if .Values.config.env.existingSecret }}
           envFrom:
             - secretRef:
-                name: {{ . }}
+                name: {{ .Values.config.env.existingSecret }}
+          {{- else if .Values.config.env.sealed }}
+          envFrom:
+            - secretRef:
+                name: {{ include "unpackerr.fullname" . }}-env
           {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
@@ -50,20 +54,29 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            {{- with .Values.config.file.existingSecret }}
+            {{- if .Values.config.file.existingSecret }}
             - name: secret-config
               mountPath: /config
               subPath: {{ .Values.config.file.existingSecretKey }}
+              readOnly: true
+            {{- else if .Values.config.file.sealed }}
+            - name: secret-config
+              mountPath: /config
+              subPath: unpackerr.conf
               readOnly: true
             {{- end }}
             {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
       volumes:
-        {{- with .Values.config.file.existingSecret }}
+        {{- if .Values.config.file.existingSecret }}
         - name: secret-config
           secret:
-            secretName: {{ . }}
+            secretName: {{ .Values.config.file.existingSecret }}
+        {{- else if .Values.config.file.sealed }}
+        - name: secret-config
+          secret:
+            secretName: {{ include "unpackerr.fullname" . }}-config-file
         {{- end }}
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
