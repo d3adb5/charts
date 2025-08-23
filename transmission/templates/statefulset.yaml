@@ -30,9 +30,11 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- toYaml .Values.extraEnv | nindent 12 }}
+          {{- if .Values.transmission.generateCredentials }}
           envFrom:
             - secretRef:
                 name: {{ include "transmission.fullname" . }}-web-secret
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
