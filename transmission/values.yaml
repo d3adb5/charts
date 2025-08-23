@@ -6,6 +6,8 @@ image:
   tag: "latest"
 
 transmission:
+  # Whether to create and mount random credentials for the web UI.
+  generateCredentials: true
   # If left empty, a random web user will be generated.
   webUser: ""
 
