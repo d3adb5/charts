@@ -1,0 +1,82 @@
+replicaCount: 1
+
+image:
+  repository: mumblevoip/mumble-server
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+
+persistence:
+  # Whether to create a PVC for Mumble server data storage.
+  enabled: false
+  # Size of the volume claim.
+  size: 1Gi
+  # Storage class to use for the volume claim.
+  storageClass: ""
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: LoadBalancer
+  port: 64738
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+mumble:
+  port: 64738
+  dataDirPath: /data
+
+  # Configuration to be written to mumble-server.ini
+  config: {}
+    # serverpassword: yourpassword
+    # welcometext: Welcome to the Mumble server!
+    # port: 64738
+
+livenessProbe:
+  tcpSocket:
+    port: 64738
+
+readinessProbe:
+  tcpSocket:
+    port: 64738
+
+# Environment variables to set in the mumble server container.
+env: []
+
+# Any extra ports to expose from the mumble server container.
+extraPorts: []
+
+# Additional volumes for the mumble server pod.
+extraVolumes: []
+
+# Additional volume mounts for the mumble server container.
+extraVolumeMounts: []
+
+# Extra volume claim templates for the StatefulSet.
+extraVolumeClaimTemplates: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+podLabels: {}

@@ -1,0 +1,13 @@
+{{- if .Values.mumble.config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mumble.fullname" . }}-config
+  labels:
+    {{- include "mumble.labels" . | nindent 4 }}
+data:
+  mumble-server.ini: |
+    {{- range $key, $value := .Values.mumble.config }}
+    {{ $key }}={{ $value }}
+    {{- end }}
+{{- end }}
