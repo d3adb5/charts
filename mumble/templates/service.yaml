@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mumble.fullname" . }}
+  labels:
+    {{- include "mumble.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.service.annotations | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: mumble-tcp
+      protocol: TCP
+      name: mumble-tcp
+    - port: {{ .Values.service.port }}
+      targetPort: mumble-udp
+      protocol: UDP
+      name: mumble-udp
+  selector:
+    {{- include "mumble.selectorLabels" . | nindent 4 }}
