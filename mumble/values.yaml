@@ -48,13 +48,15 @@ mumble:
     # welcometext: Welcome to the Mumble server!
     # port: 64738
 
-livenessProbe:
-  tcpSocket:
-    port: 64738
+livenessProbe: {}
+  # periodSeconds: 300
+  # tcpSocket:
+  #   port: 64738
 
-readinessProbe:
-  tcpSocket:
-    port: 64738
+readinessProbe: {}
+  # periodSeconds: 300
+  # tcpSocket:
+  #   port: 64738
 
 # Environment variables to set in the mumble server container.
 env: []
