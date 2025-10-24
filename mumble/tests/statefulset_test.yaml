@@ -1,0 +1,57 @@
+suite: StatefulSet
+
+templates:
+  - statefulset.yaml
+
+tests:
+  - it: should fail if multiple config sources are given
+    release:
+      name: mumble
+    set:
+      mumble:
+        sealedConfig: "example"
+        config:
+          testing: "example"
+    asserts:
+      - failedTemplate:
+          errorMessage: "Multiple configs provided: config/sealedConfig/configSecretName"
+
+  - it: mounts config file from sealed secret when given
+    release:
+      name: mumble
+    set:
+      mumble:
+        sealedConfig: "example"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mumble-config
+            secret:
+              secretName: mumble-config
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: mumble-config
+            mountPath: /config/mumble-server.ini
+            subPath: mumble-server.ini
+
+  - it: mounts config file from existing secret when given
+    release:
+      name: mumble
+    set:
+      mumble:
+        configSecretName: "example-secret"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mumble-config
+            secret:
+              secretName: example-secret
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: mumble-config
+            mountPath: /config/mumble-server.ini
+            subPath: mumble-server.ini
