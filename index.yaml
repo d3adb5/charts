@@ -21,6 +21,17 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/ddclient-0.1.0/ddclient-0.1.0.tgz
     version: 0.1.0
+  mumble:
+  - apiVersion: v2
+    appVersion: v1.5.735
+    created: "2025-10-24T07:02:12.587321749Z"
+    description: Open Source, Low Latency, High Quality Voice Chat
+    digest: 903c514fcf3346f6d549a7c35d8bf2bd863691d824e2f59a2f92a1edbb4cad4f
+    name: mumble
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/mumble-0.1.0/mumble-0.1.0.tgz
+    version: 0.1.0
   stateful:
   - apiVersion: v2
     created: "2024-04-14T01:55:39.991205825Z"
@@ -90,4 +101,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2025-08-23T03:18:37.744436839Z"
+generated: "2025-10-24T07:02:12.587337719Z"
