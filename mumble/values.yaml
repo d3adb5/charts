@@ -40,7 +40,13 @@ resources: {}
 
 mumble:
   port: 64738
-  dataDirPath: /data
+
+  # SealedSecret encrypted configuration file.
+  # NOTE: Secret will use a generated name based on the release name.
+  sealedConfig: ""
+
+  # Name of an existing Secret containing a 'mumble-server.ini'.
+  configSecretName: ""
 
   # Configuration to be written to mumble-server.ini
   config: {}

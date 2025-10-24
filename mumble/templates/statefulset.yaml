@@ -1,5 +1,15 @@
 # {{ required "image.repository needs to be defined!" .Values.image.repository }}
 # {{ required "service.port needs to be defined!" .Values.service.port }}
+
+{{- $providedConfig := false }}
+{{- with .Values.mumble }}
+  {{- $configs := list .config .sealedConfig .configSecretName | compact }}
+  {{- $providedConfig = gt (len $configs) 0 }}
+  {{- if gt (len $configs) 1 }}
+    {{- fail "Multiple configs provided: config/sealedConfig/configSecretName" }}
+  {{- end }}
+{{- end }}
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -31,7 +41,14 @@ spec:
           image: "{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- toYaml .Values.env | nindent 12 }}
+            {{- if $providedConfig }}
+            - name: MUMBLE_CUSTOM_CONFIG_FILE
+              value: "/config/mumble-server.ini"
+            {{- end }}
+
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           ports:
             - name: mumble-tcp
               containerPort: {{ .Values.mumble.port }}
@@ -52,9 +69,9 @@ spec:
             - name: data
               mountPath: {{ .Values.mumble.dataDirPath }}
 
-            {{- if .Values.mumble.config }}
+            {{- if $providedConfig }}
             - name: mumble-config
-              mountPath: /data/mumble-server.ini
+              mountPath: /config/mumble-server.ini
               subPath: mumble-server.ini
             {{- end }}
 
@@ -70,10 +87,18 @@ spec:
           emptyDir: {}
           {{- end }}
 
-        {{- if .Values.mumble.config }}
+        {{- if $providedConfig }}
         - name: mumble-config
+          {{- if .Values.mumble.config }}
           configMap:
             name: {{ include "mumble.fullname" . }}-config
+          {{- else if .Values.mumble.sealedConfig }}
+          secret:
+            secretName: {{ include "mumble.fullname" . }}-config
+          {{- else }}
+          secret:
+            secretName: {{ .Values.mumble.configSecretName }}
+          {{- end }}
         {{- end }}
 
         {{- with .Values.extraVolumes }}
