@@ -83,6 +83,11 @@ spec:
               subPath: mumble-server.ini
             {{- end }}
 
+            {{- if .Values.mumble.certificate.create }}
+            - name: mumble-tls
+              mountPath: /certs
+            {{- end }}
+
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -107,6 +112,12 @@ spec:
           secret:
             secretName: {{ .Values.mumble.configSecretName }}
           {{- end }}
+        {{- end }}
+
+        {{- if .Values.mumble.certificate.create }}
+        - name: mumble-tls
+          secret:
+            secretName: {{ include "mumble.fullname" . }}-tls
         {{- end }}
 
         {{- with .Values.extraVolumes }}
