@@ -3,6 +3,6 @@ name: mumble
 description: Open Source, Low Latency, High Quality Voice Chat
 type: application
 
-version: 0.1.0
+version: 0.2.0
 
 appVersion: "v1.5.735"
