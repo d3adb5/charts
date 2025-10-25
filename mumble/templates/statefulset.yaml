@@ -59,12 +59,20 @@ spec:
             {{- with .Values.extraPorts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+
+          {{- with .Values.livenessProbe }}
           livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .Values.readinessProbe }}
           readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+
           volumeMounts:
             - name: data
               mountPath: {{ .Values.mumble.dataDirPath }}
@@ -73,6 +81,11 @@ spec:
             - name: mumble-config
               mountPath: /config/mumble-server.ini
               subPath: mumble-server.ini
+            {{- end }}
+
+            {{- if .Values.mumble.certificate.create }}
+            - name: mumble-tls
+              mountPath: /certs
             {{- end }}
 
             {{- with .Values.extraVolumeMounts }}
@@ -99,6 +112,12 @@ spec:
           secret:
             secretName: {{ .Values.mumble.configSecretName }}
           {{- end }}
+        {{- end }}
+
+        {{- if .Values.mumble.certificate.create }}
+        - name: mumble-tls
+          secret:
+            secretName: {{ include "mumble.fullname" . }}-tls
         {{- end }}
 
         {{- with .Values.extraVolumes }}

@@ -1,0 +1,19 @@
+{{- if .Values.mumble.certificate.create }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "mumble.fullname" . }}-tls
+  labels:
+    {{- include "mumble.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+    {{- toYaml .Values.mumble.certificate.dnsNames | nindent 4 }}
+  issuerRef:
+    {{- toYaml .Values.mumble.certificate.issuer | nindent 4 }}
+  secretName: {{ include "mumble.fullname" . }}-tls
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+{{- end }}
