@@ -24,6 +24,16 @@ entries:
   mumble:
   - apiVersion: v2
     appVersion: v1.5.735
+    created: "2025-10-26T07:18:33.780903545Z"
+    description: Open Source, Low Latency, High Quality Voice Chat
+    digest: 6a8dabea6242e23f09102a77bb9e97cc5a324cb79332f1b3b4cfaa6d24ca455f
+    name: mumble
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/mumble-0.2.2/mumble-0.2.2.tgz
+    version: 0.2.2
+  - apiVersion: v2
+    appVersion: v1.5.735
     created: "2025-10-26T07:14:03.840141961Z"
     description: Open Source, Low Latency, High Quality Voice Chat
     digest: 4171228fc4965eb58880b99a8945f2c75a182cde68eab2afc76c465a03fc7964
@@ -121,4 +131,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2025-10-26T07:14:03.84016261Z"
+generated: "2025-10-26T07:18:33.780929954Z"
