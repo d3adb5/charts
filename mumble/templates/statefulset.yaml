@@ -130,7 +130,8 @@ spec:
 
   volumeClaimTemplates:
     {{- if .Values.persistence.enabled }}
-    - name: data
+    - metadata:
+        name: data
       spec:
         accessModes: [ "ReadWriteOnce" ]
         resources:
