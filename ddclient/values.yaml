@@ -37,7 +37,7 @@ config:
 image:
   repository: ghcr.io/d3adb5/ddclient
   pullPolicy: IfNotPresent
-  tag: 3.11.2
+  tag: 4.0.0
 
 imagePullSecrets: []
 
