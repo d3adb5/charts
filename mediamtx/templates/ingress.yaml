@@ -1,0 +1,34 @@
+{{- if .Values.ingress.enabled -}}
+{{- $portAddresses := dict "hls" .Values.mtxConfig.hlsAddress "webrtc" .Values.mtxConfig.webrtcAddress "api" .Values.mtxConfig.apiAddress "metrics" .Values.mtxConfig.metricsAddress }}
+{{- $address := get $portAddresses .Values.ingress.portName }}
+{{- if not $address }}
+{{- fail "ingress.portName must be one of: hls, webrtc, api, metrics" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "mediamtx.fullname" . }}
+  labels:
+    {{- include "mediamtx.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ quote .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "mediamtx.fullname" . }}-http
+                port:
+                  number: {{ include "mediamtx.portFromAddress" $address }}
+{{- end }}

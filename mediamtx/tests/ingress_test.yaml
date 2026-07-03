@@ -1,0 +1,70 @@
+suite: Ingress
+
+templates:
+  - ingress.yaml
+
+tests:
+  - it: is not rendered by default
+    release:
+      name: mediamtx
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: targets the hls port on the http Service by default
+    release:
+      name: mediamtx
+    set:
+      ingress:
+        enabled: true
+        host: example.com
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: mediamtx-http
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8888
+
+  - it: can target the api port
+    release:
+      name: mediamtx
+    set:
+      ingress:
+        enabled: true
+        host: example.com
+        portName: api
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 9997
+
+  - it: fails for an unroutable port name
+    release:
+      name: mediamtx
+    set:
+      ingress:
+        enabled: true
+        host: example.com
+        portName: rtsp
+    asserts:
+      - failedTemplate:
+          errorPattern: "ingress.portName must be one of"
+
+  - it: terminates TLS when enabled
+    release:
+      name: mediamtx
+    set:
+      ingress:
+        enabled: true
+        host: example.com
+        tls:
+          enabled: true
+          secretName: example-com-tls
+    asserts:
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: example.com
+      - equal:
+          path: spec.tls[0].secretName
+          value: example-com-tls

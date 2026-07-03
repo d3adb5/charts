@@ -1,0 +1,228 @@
+# --- WARNING ---
+# MediaMTX is not designed to scale horizontally: every replica would run its
+# own independent server, unaware of streams published to the others. Use
+# replicaCount only to scale down declaratively.
+# --- WARNING ---
+replicaCount: 1
+
+image:
+  repository: bluenviron/mediamtx
+  # Image variant. One of "", "ffmpeg" (adds FFmpeg, for on-demand
+  # transcoding/re-encoding), "rpi" (Raspberry Pi Camera support) or
+  # "ffmpeg-rpi".
+  variant: ""
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # The recordings volume is only writable by this group.
+  # fsGroup: 9997
+
+securityContext: {}
+  # MediaMTX ships as a single static binary on top of a scratch image, so it
+  # runs fine as an arbitrary non-root UID.
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 9997
+
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# MediaMTX configuration, rendered as-is into a ConfigMap and mounted as
+# /mediamtx.yml. Any option understood by MediaMTX can be set here; unset
+# options fall back to MediaMTX's own built-in defaults. See the reference
+# configuration file for the full list of available options:
+# https://github.com/bluenviron/mediamtx/blob/main/mediamtx.yml
+mtxConfig:
+  logLevel: info
+  logDestinations: [stdout]
+
+  # Control API. Only reachable from localhost without authentication, so it
+  # is safe to enable by default; see mtxConfig.authInternalUsers to open it
+  # up further.
+  api: true
+  apiAddress: :9997
+
+  # Prometheus-compatible metrics.
+  metrics: true
+  metricsAddress: :9998
+
+  rtsp: true
+  # UDP transports require the pod to be reachable on those ports directly
+  # (e.g. hostNetwork, see below), since a ClusterIP/LoadBalancer Service
+  # breaks the source IP/port matching RTSP relies on for UDP. TCP works
+  # fine through a regular Service and is the safer default.
+  rtspTransports: [tcp]
+  rtspAddress: :8554
+
+  rtmp: true
+  rtmpAddress: :1935
+
+  hls: true
+  hlsAddress: :8888
+
+  webrtc: true
+  webrtcAddress: :8889
+  webrtcLocalUDPAddress: :8189
+  # Set this to the externally reachable IP(s)/hostname(s) of the server
+  # (e.g. a MetalLB LoadBalancer IP) so that WebRTC clients outside the
+  # cluster can complete the ICE handshake.
+  webrtcAdditionalHosts: []
+
+  srt: true
+  srtAddress: :8890
+
+  pathDefaults: {}
+    # record: true
+
+  paths:
+    all_others: {}
+
+# Additional environment variables injected into the container. Any
+# MediaMTX configuration key can also be overridden this way, by setting
+# MTX_ + the uppercased key name (e.g. MTX_WEBRTCADDITIONALHOSTS).
+env: []
+# - name: MTX_WEBRTCADDITIONALHOSTS
+#   value: "203.0.113.10"
+
+# Environment variables sourced from a Secret, meant for values that
+# shouldn't live in plain values.yaml (e.g. MTX_AUTHINTERNALUSERS0_PASS).
+secretEnv:
+  # If you have an existing Secret with your environment variables, name it
+  # here. All other settings under 'secretEnv' will be ignored if you use
+  # this.
+  existingSecret: ""
+  # If you have deployed Sealed Secrets, you can place encrypted values here
+  # instead.
+  sealed: {}
+    # Example:
+    # MTX_AUTHINTERNALUSERS0_PASS: "AgAAGQABhY2NvdW50X2lk..."
+
+# Use the host's network namespace instead of the pod network. This is the
+# only reliable way to get UDP-based RTSP transport working (see
+# mtxConfig.rtspTransports above), and can also help WebRTC/SRT NAT
+# traversal on single-node clusters. Not compatible with running more than
+# one replica per node.
+hostNetwork: false
+# Only applied when hostNetwork is true.
+dnsPolicy: ClusterFirstWithHostNet
+
+# Non-HTTP ports (raw RTSP/RTMP/SRT/WebRTC-ICE). These can't be routed
+# through an Ingress, so they get their own Service, defaulting to
+# LoadBalancer so they're directly reachable from outside the cluster (e.g.
+# via MetalLB on a bare-metal/Talos cluster).
+service:
+  type: LoadBalancer
+  annotations: {}
+  # Only relevant for LoadBalancer/NodePort Services: routes traffic
+  # directly to the node that received it, preserving the client source IP.
+  # Recommended here since ICE negotiation and SRT depend on a stable
+  # source address, and UDP in general doesn't survive SNAT well.
+  externalTrafficPolicy: Local
+  # Ports are only added to the container/Service when the corresponding
+  # protocol is enabled in mtxConfig above; the port number itself is taken
+  # from the matching mtxConfig *Address field.
+  ports:
+    rtsp:
+      enabled: true
+    rtmp:
+      enabled: true
+    webrtcIce:
+      enabled: true
+    srt:
+      enabled: true
+
+# HTTP-based ports (HLS playback, WebRTC signaling, control API, metrics).
+# Kept on a separate, ClusterIP-by-default Service so it can be fronted by
+# the Ingress below instead of being exposed directly.
+httpService:
+  type: ClusterIP
+  annotations: {}
+  externalTrafficPolicy: ""
+  ports:
+    hls:
+      enabled: true
+    webrtc:
+      enabled: true
+    api:
+      enabled: false
+    metrics:
+      enabled: true
+
+# Ingress for httpService, above. Terminates TLS at the controller (plain
+# HTTP is forwarded to MediaMTX) when ingress.tls.enabled is set.
+# RTSP/RTMP/SRT/WebRTC-ICE are raw TCP/UDP protocols and cannot be routed
+# through an Ingress; they're exposed via the LoadBalancer Service instead.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt
+  # Which port on httpService to route to. One of: hls, webrtc, api, metrics.
+  portName: hls
+  # host: example.com
+  tls:
+    enabled: false
+    # secretName: chart-example-tls
+
+# Recordings are always mounted at /recordings, matching the default
+# recordPath (./recordings/...) in mtxConfig.pathDefaults. Enable
+# persistence to keep recordings across pod restarts.
+persistence:
+  enabled: false
+  size: 10Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+# Must reference a port that is actually enabled in mtxConfig above.
+livenessProbe:
+  tcpSocket:
+    port: rtsp
+readinessProbe:
+  tcpSocket:
+    port: rtsp
+
+# Additional volumes on the output StatefulSet definition.
+extraVolumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output StatefulSet definition.
+extraVolumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+# Additional volumeClaimTemplates on the output StatefulSet definition.
+extraVolumeClaimTemplates: []
+# - metadata:
+#     name: foo
+#   spec:
+#     accessModes: [ "ReadWriteOnce" ]
+#     storageClassName: "foo"
+#     resources:
+#       requests:
+#         storage: 1Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

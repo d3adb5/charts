@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mediamtx.fullname" . }}
+  labels:
+    {{- include "mediamtx.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "mediamtx.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mediamtx.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ toYaml .Values.mtxConfig | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "mediamtx.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "mediamtx.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          {{- if .Values.secretEnv.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secretEnv.existingSecret }}
+          {{- else if .Values.secretEnv.sealed }}
+          envFrom:
+            - secretRef:
+                name: {{ include "mediamtx.fullname" . }}-env
+          {{- end }}
+          ports:
+            {{- if .Values.mtxConfig.rtsp }}
+            - name: rtsp
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.rtspAddress }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.mtxConfig.rtmp }}
+            - name: rtmp
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.rtmpAddress }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.mtxConfig.hls }}
+            - name: hls
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.hlsAddress }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.mtxConfig.webrtc }}
+            - name: webrtc
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.webrtcAddress }}
+              protocol: TCP
+            {{- if .Values.mtxConfig.webrtcLocalUDPAddress }}
+            - name: webrtc-ice
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.webrtcLocalUDPAddress }}
+              protocol: UDP
+            {{- end }}
+            {{- end }}
+            {{- if .Values.mtxConfig.srt }}
+            - name: srt
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.srtAddress }}
+              protocol: UDP
+            {{- end }}
+            {{- if .Values.mtxConfig.api }}
+            - name: api
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.apiAddress }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.mtxConfig.metrics }}
+            - name: metrics
+              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.metricsAddress }}
+              protocol: TCP
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /mediamtx.yml
+              subPath: mediamtx.yml
+              readOnly: true
+            - name: recordings
+              mountPath: /recordings
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "mediamtx.fullname" . }}
+        {{- if not .Values.persistence.enabled }}
+        - name: recordings
+          emptyDir: {}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    {{- if .Values.persistence.enabled }}
+    - metadata:
+        name: recordings
+      spec:
+        accessModes: [ {{ .Values.persistence.accessMode | quote }} ]
+        storageClassName: {{ .Values.persistence.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+    {{- end }}
+    {{- with .Values.extraVolumeClaimTemplates }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}

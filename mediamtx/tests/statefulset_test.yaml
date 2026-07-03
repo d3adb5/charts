@@ -1,0 +1,139 @@
+suite: StatefulSet
+
+templates:
+  - statefulset.yaml
+
+tests:
+  - it: exposes container ports for enabled protocols only
+    release:
+      name: mediamtx
+    set:
+      mtxConfig:
+        rtsp: true
+        rtmp: false
+        hls: true
+        webrtc: false
+        srt: false
+        api: false
+        metrics: false
+        rtspAddress: ":8554"
+        hlsAddress: ":8888"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports
+          value:
+            - name: rtsp
+              containerPort: 8554
+              protocol: TCP
+            - name: hls
+              containerPort: 8888
+              protocol: TCP
+
+  - it: adds a webrtc-ice port only when webrtc and its UDP address are set
+    release:
+      name: mediamtx
+    set:
+      mtxConfig:
+        rtsp: false
+        rtmp: false
+        hls: false
+        webrtc: true
+        webrtcAddress: ":8889"
+        webrtcLocalUDPAddress: ""
+        srt: false
+        api: false
+        metrics: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: webrtc-ice
+
+  - it: mounts an emptyDir for recordings by default
+    release:
+      name: mediamtx
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: recordings
+            emptyDir: {}
+
+  - it: uses a volumeClaimTemplate for recordings when persistence is enabled
+    release:
+      name: mediamtx
+    set:
+      persistence:
+        enabled: true
+        size: 5Gi
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: recordings
+            emptyDir: {}
+      - equal:
+          path: spec.volumeClaimTemplates[0].metadata.name
+          value: recordings
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 5Gi
+
+  - it: sets hostNetwork and dnsPolicy when enabled
+    release:
+      name: mediamtx
+    set:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+    asserts:
+      - equal:
+          path: spec.template.spec.hostNetwork
+          value: true
+      - equal:
+          path: spec.template.spec.dnsPolicy
+          value: ClusterFirstWithHostNet
+
+  - it: does not set hostNetwork by default
+    release:
+      name: mediamtx
+    asserts:
+      - isNull:
+          path: spec.template.spec.hostNetwork
+
+  - it: grabs environment variables from a sealed secret when given
+    release:
+      name: mediamtx
+    set:
+      secretEnv:
+        sealed:
+          MTX_AUTHINTERNALUSERS0_PASS: "example_value"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - secretRef:
+                name: mediamtx-env
+
+  - it: grabs environment variables from an existing secret when given
+    release:
+      name: mediamtx
+    set:
+      secretEnv:
+        existingSecret: "example-secret"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - secretRef:
+                name: example-secret
+
+  - it: appends the image variant suffix to the tag
+    release:
+      name: mediamtx
+    set:
+      image:
+        variant: ffmpeg
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '-ffmpeg$'

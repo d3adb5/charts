@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mediamtx.fullname" . }}
+  labels:
+    {{- include "mediamtx.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.service.annotations | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  {{- with .Values.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  ports:
+    {{- if and .Values.mtxConfig.rtsp .Values.service.ports.rtsp.enabled }}
+    - name: rtsp
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.rtspAddress }}
+      targetPort: rtsp
+      protocol: TCP
+    {{- end }}
+    {{- if and .Values.mtxConfig.rtmp .Values.service.ports.rtmp.enabled }}
+    - name: rtmp
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.rtmpAddress }}
+      targetPort: rtmp
+      protocol: TCP
+    {{- end }}
+    {{- if and (and .Values.mtxConfig.webrtc .Values.mtxConfig.webrtcLocalUDPAddress) .Values.service.ports.webrtcIce.enabled }}
+    - name: webrtc-ice
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.webrtcLocalUDPAddress }}
+      targetPort: webrtc-ice
+      protocol: UDP
+    {{- end }}
+    {{- if and .Values.mtxConfig.srt .Values.service.ports.srt.enabled }}
+    - name: srt
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.srtAddress }}
+      targetPort: srt
+      protocol: UDP
+    {{- end }}
+  selector:
+    {{- include "mediamtx.selectorLabels" . | nindent 4 }}

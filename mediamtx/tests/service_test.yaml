@@ -1,0 +1,91 @@
+suite: Service
+
+templates:
+  - service.yaml
+
+tests:
+  - it: defaults to LoadBalancer
+    release:
+      name: mediamtx
+    asserts:
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+
+  - it: exposes a port only when both the protocol and the service port are enabled
+    release:
+      name: mediamtx
+    set:
+      mtxConfig:
+        rtsp: true
+        rtmp: true
+        webrtc: false
+        srt: false
+      service:
+        ports:
+          rtsp:
+            enabled: true
+          rtmp:
+            enabled: false
+          webrtcIce:
+            enabled: false
+          srt:
+            enabled: false
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - name: rtsp
+              port: 8554
+              targetPort: rtsp
+              protocol: TCP
+
+  - it: never exposes HTTP-based ports
+    release:
+      name: mediamtx
+    asserts:
+      - notContains:
+          path: spec.ports
+          content:
+            name: hls
+      - notContains:
+          path: spec.ports
+          content:
+            name: webrtc
+      - notContains:
+          path: spec.ports
+          content:
+            name: api
+      - notContains:
+          path: spec.ports
+          content:
+            name: metrics
+
+  - it: omits the webrtc-ice port when webrtcLocalUDPAddress is empty
+    release:
+      name: mediamtx
+    set:
+      mtxConfig:
+        webrtc: true
+        webrtcAddress: ":8889"
+        webrtcLocalUDPAddress: ""
+      service:
+        ports:
+          webrtcIce:
+            enabled: true
+    asserts:
+      - notContains:
+          path: spec.ports
+          content:
+            name: webrtc-ice
+
+  - it: sets externalTrafficPolicy when given
+    release:
+      name: mediamtx
+    set:
+      service:
+        externalTrafficPolicy: Local
+    asserts:
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
