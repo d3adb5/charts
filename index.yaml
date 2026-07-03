@@ -31,6 +31,18 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/ddclient-0.1.0/ddclient-0.1.0.tgz
     version: 0.1.0
+  mediamtx:
+  - apiVersion: v2
+    appVersion: 1.19.2
+    created: "2026-07-03T23:40:22.902444534Z"
+    description: Ready-to-use media server and media proxy for SRT, WebRTC, RTSP,
+      RTMP and HLS
+    digest: 81deff9ee06eb090abf8dec9fb9fdda9119ef01d6e38d83769719f5f56f96906
+    name: mediamtx
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/mediamtx-0.1.0/mediamtx-0.1.0.tgz
+    version: 0.1.0
   mumble:
   - apiVersion: v2
     appVersion: v1.5.735
@@ -141,4 +153,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2026-02-19T10:23:41.557879267Z"
+generated: "2026-07-03T23:40:22.902466355Z"
