@@ -1,0 +1,8 @@
+apiVersion: v2
+name: mediamtx
+description: Ready-to-use media server and media proxy for SRT, WebRTC, RTSP, RTMP and HLS
+type: application
+
+version: 0.1.0
+
+appVersion: "1.19.2"

@@ -1,0 +1,70 @@
+suite: HTTP Service
+
+templates:
+  - service-http.yaml
+
+tests:
+  - it: defaults to ClusterIP
+    release:
+      name: mediamtx
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+
+  - it: exposes a port only when both the protocol and the service port are enabled
+    release:
+      name: mediamtx
+    set:
+      mtxConfig:
+        hls: true
+        webrtc: false
+        api: false
+        metrics: false
+      httpService:
+        ports:
+          hls:
+            enabled: true
+          webrtc:
+            enabled: false
+          api:
+            enabled: false
+          metrics:
+            enabled: false
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - name: hls
+              port: 8888
+              targetPort: hls
+              protocol: TCP
+
+  - it: never exposes non-HTTP ports
+    release:
+      name: mediamtx
+    asserts:
+      - notContains:
+          path: spec.ports
+          content:
+            name: rtsp
+      - notContains:
+          path: spec.ports
+          content:
+            name: rtmp
+      - notContains:
+          path: spec.ports
+          content:
+            name: srt
+      - notContains:
+          path: spec.ports
+          content:
+            name: webrtc-ice
+
+  - it: is named with an -http suffix
+    release:
+      name: mediamtx
+    asserts:
+      - equal:
+          path: metadata.name
+          value: mediamtx-http

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mediamtx.fullname" . }}-http
+  labels:
+    {{- include "mediamtx.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.httpService.annotations | nindent 4 }}
+spec:
+  type: {{ .Values.httpService.type }}
+  {{- with .Values.httpService.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  ports:
+    {{- if and .Values.mtxConfig.hls .Values.httpService.ports.hls.enabled }}
+    - name: hls
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.hlsAddress }}
+      targetPort: hls
+      protocol: TCP
+    {{- end }}
+    {{- if and .Values.mtxConfig.webrtc .Values.httpService.ports.webrtc.enabled }}
+    - name: webrtc
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.webrtcAddress }}
+      targetPort: webrtc
+      protocol: TCP
+    {{- end }}
+    {{- if and .Values.mtxConfig.api .Values.httpService.ports.api.enabled }}
+    - name: api
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.apiAddress }}
+      targetPort: api
+      protocol: TCP
+    {{- end }}
+    {{- if and .Values.mtxConfig.metrics .Values.httpService.ports.metrics.enabled }}
+    - name: metrics
+      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.metricsAddress }}
+      targetPort: metrics
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "mediamtx.selectorLabels" . | nindent 4 }}
