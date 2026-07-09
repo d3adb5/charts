@@ -115,6 +115,15 @@ entries:
     version: 1.0.0
   transmission:
   - apiVersion: v2
+    created: "2026-07-09T03:31:17.2360643Z"
+    description: A Fast, Easy and Free Bittorrent Client
+    digest: bd1d3af2e56c5681c231e09df97f4f3872fafeb731b0744600fea69e06d0ad1b
+    name: transmission
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/transmission-0.3.0/transmission-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v2
     created: "2025-08-23T03:18:37.744412684Z"
     description: A Fast, Easy and Free Bittorrent Client
     digest: cdf77002d27e7a0a55657e4288bae082f2cff58a720bd649559431339afe33be
@@ -163,4 +172,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2026-07-05T14:54:18.887532057Z"
+generated: "2026-07-09T03:31:17.236108403Z"
