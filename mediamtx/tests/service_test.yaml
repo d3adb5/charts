@@ -4,45 +4,67 @@ templates:
   - service.yaml
 
 tests:
-  - it: defaults to LoadBalancer
+  - it: defaults to a LoadBalancer carrying the raw UDP listeners
     release:
       name: mediamtx
     asserts:
       - equal:
           path: spec.type
           value: LoadBalancer
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
+      - equal:
+          path: spec.ports
+          value:
+            - name: srt
+              port: 8890
+              targetPort: srt
+              protocol: UDP
+            - name: webrtc-ice
+              port: 8189
+              targetPort: webrtc-ice
+              protocol: UDP
 
-  - it: exposes a port only when both the protocol and the service port are enabled
+  - it: is not rendered at all when nothing is exposed
     release:
       name: mediamtx
     set:
-      mtxConfig:
-        rtsp: true
-        rtmp: true
-        webrtc: false
-        srt: false
-      service:
-        ports:
-          rtsp:
-            enabled: true
-          rtmp:
-            enabled: false
-          webrtcIce:
-            enabled: false
-          srt:
-            enabled: false
+      protocols:
+        srt:
+          expose: false
+        webrtc:
+          expose: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: carries a port only when the protocol is enabled and exposed
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        srt: {enabled: true, port: 8890, expose: true}
+        rtsp: {enabled: true, port: 8554, expose: false}
+        rtmp: {enabled: false, expose: true}
+        webrtc: {enabled: false}
     asserts:
       - equal:
           path: spec.ports
           value:
-            - name: rtsp
-              port: 8554
-              targetPort: rtsp
-              protocol: TCP
+            - name: srt
+              port: 8890
+              targetPort: srt
+              protocol: UDP
 
-  - it: never exposes HTTP-based ports
+  - it: never carries HTTP-based ports
     release:
       name: mediamtx
+    set:
+      protocols:
+        hls: {enabled: true}
+        playback: {enabled: true}
+        pprof: {enabled: true}
     asserts:
       - notContains:
           path: spec.ports
@@ -60,32 +82,37 @@ tests:
           path: spec.ports
           content:
             name: metrics
-
-  - it: omits the webrtc-ice port when webrtcLocalUDPAddress is empty
-    release:
-      name: mediamtx
-    set:
-      mtxConfig:
-        webrtc: true
-        webrtcAddress: ":8889"
-        webrtcLocalUDPAddress: ""
-      service:
-        ports:
-          webrtcIce:
-            enabled: true
-    asserts:
       - notContains:
           path: spec.ports
           content:
-            name: webrtc-ice
+            name: playback
+      - notContains:
+          path: spec.ports
+          content:
+            name: pprof
 
-  - it: sets externalTrafficPolicy when given
+  - it: can be switched to ClusterIP for in-cluster-only access
     release:
       name: mediamtx
     set:
       service:
-        externalTrafficPolicy: Local
+        type: ClusterIP
+        externalTrafficPolicy: ""
     asserts:
       - equal:
+          path: spec.type
+          value: ClusterIP
+      - isNull:
           path: spec.externalTrafficPolicy
-          value: Local
+
+  - it: passes through annotations, for MetalLB address pinning
+    release:
+      name: mediamtx
+    set:
+      service:
+        annotations:
+          metallb.io/loadBalancerIPs: "192.168.1.40"
+    asserts:
+      - equal:
+          path: metadata.annotations["metallb.io/loadBalancerIPs"]
+          value: "192.168.1.40"

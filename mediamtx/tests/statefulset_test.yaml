@@ -8,16 +8,20 @@ tests:
     release:
       name: mediamtx
     set:
-      mtxConfig:
-        rtsp: true
-        rtmp: false
-        hls: true
-        webrtc: false
-        srt: false
-        api: false
-        metrics: false
-        rtspAddress: ":8554"
-        hlsAddress: ":8888"
+      protocols:
+        rtsp: {enabled: true, port: 8554}
+        hls: {enabled: true, port: 8888}
+        rtmp: {enabled: false}
+        srt: {enabled: false}
+        webrtc: {enabled: false}
+        api: {enabled: false}
+        metrics: {enabled: false}
+      livenessProbe:
+        tcpSocket:
+          port: rtsp
+      readinessProbe:
+        tcpSocket:
+          port: rtsp
     asserts:
       - equal:
           path: spec.template.spec.containers[0].ports
@@ -29,25 +33,119 @@ tests:
               containerPort: 8888
               protocol: TCP
 
-  - it: adds a webrtc-ice port only when webrtc and its UDP address are set
+  - it: adds the RTP/RTCP pair only when RTSP uses a UDP transport
     release:
       name: mediamtx
     set:
+      protocols:
+        rtsp: {enabled: true, port: 8554, rtpPort: 8000, rtcpPort: 8001}
+        srt: {enabled: false}
+        webrtc: {enabled: false}
+        api: {enabled: false}
+        metrics: {enabled: false}
       mtxConfig:
-        rtsp: false
-        rtmp: false
-        hls: false
-        webrtc: true
-        webrtcAddress: ":8889"
-        webrtcLocalUDPAddress: ""
-        srt: false
-        api: false
-        metrics: false
+        rtspTransports: [tcp, udp]
+      livenessProbe:
+        tcpSocket:
+          port: rtsp
+      readinessProbe:
+        tcpSocket:
+          port: rtsp
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: rtp
+            containerPort: 8000
+            protocol: UDP
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: rtcp
+            containerPort: 8001
+            protocol: UDP
+
+  - it: omits the RTP/RTCP pair for the default TCP-only transport
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, port: 8554}
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: rtp
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: rtcp
+
+  - it: omits the webrtc-ice port when no ICE port is configured
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        webrtc: {enabled: true, port: 8889, icePort: null}
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].ports
           content:
             name: webrtc-ice
+
+  - it: serves MoQ over both TCP and UDP on one port when enabled
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        moq: {enabled: true, port: 8892}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: moq-h2
+            containerPort: 8892
+            protocol: TCP
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: moq-h3
+            containerPort: 8892
+            protocol: UDP
+
+  - it: injects each user password from the auth Secret, indexed in order
+    release:
+      name: mediamtx
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: MTX_AUTHINTERNALUSERS_0_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mediamtx-auth
+                  key: publisher
+            - name: MTX_AUTHINTERNALUSERS_1_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mediamtx-auth
+                  key: reader
+            - name: MTX_AUTHINTERNALUSERS_2_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mediamtx-auth
+                  key: admin
+
+  - it: reads passwords from an existing Secret when one is named
+    release:
+      name: mediamtx
+    set:
+      auth:
+        existingSecret: my-creds
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name
+          value: my-creds
 
   - it: mounts an emptyDir for recordings by default
     release:
@@ -106,7 +204,7 @@ tests:
     set:
       secretEnv:
         sealed:
-          MTX_AUTHINTERNALUSERS0_PASS: "example_value"
+          MTX_PATHS_LAPTOP_SRTPUBLISHPASSPHRASE: "example_value"
     asserts:
       - equal:
           path: spec.template.spec.containers[0].envFrom
@@ -137,3 +235,14 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: '-ffmpeg$'
+
+  - it: refuses a probe pointing at a port no enabled protocol provides
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        api:
+          enabled: false
+    asserts:
+      - failedTemplate:
+          errorPattern: 'probe references port "api", which no enabled protocol provides'

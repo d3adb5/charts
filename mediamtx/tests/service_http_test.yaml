@@ -4,45 +4,54 @@ templates:
   - service-http.yaml
 
 tests:
-  - it: defaults to ClusterIP
+  - it: defaults to ClusterIP with the HTTP listeners
     release:
       name: mediamtx
     asserts:
+      - equal:
+          path: metadata.name
+          value: mediamtx-http
       - equal:
           path: spec.type
           value: ClusterIP
-
-  - it: exposes a port only when both the protocol and the service port are enabled
-    release:
-      name: mediamtx
-    set:
-      mtxConfig:
-        hls: true
-        webrtc: false
-        api: false
-        metrics: false
-      httpService:
-        ports:
-          hls:
-            enabled: true
-          webrtc:
-            enabled: false
-          api:
-            enabled: false
-          metrics:
-            enabled: false
-    asserts:
       - equal:
           path: spec.ports
           value:
-            - name: hls
-              port: 8888
-              targetPort: hls
+            - name: webrtc
+              port: 8889
+              targetPort: webrtc
+              protocol: TCP
+            - name: api
+              port: 9997
+              targetPort: api
+              protocol: TCP
+            - name: metrics
+              port: 9998
+              targetPort: metrics
               protocol: TCP
 
-  - it: never exposes non-HTTP ports
+  - it: is not rendered at all when no HTTP protocol is enabled
     release:
       name: mediamtx
+    set:
+      protocols:
+        webrtc: {enabled: false}
+        api: {enabled: false}
+        metrics: {enabled: false}
+      livenessProbe: null
+      readinessProbe: null
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: never carries raw TCP/UDP ports
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true}
+        rtmp: {enabled: true}
+        moq: {enabled: true}
     asserts:
       - notContains:
           path: spec.ports
@@ -60,11 +69,30 @@ tests:
           path: spec.ports
           content:
             name: webrtc-ice
+      - notContains:
+          path: spec.ports
+          content:
+            name: moq-h2
 
-  - it: is named with an -http suffix
+  - it: picks up newly enabled HTTP protocols
     release:
       name: mediamtx
+    set:
+      protocols:
+        hls: {enabled: true, port: 8888}
+        playback: {enabled: true, port: 9996}
     asserts:
-      - equal:
-          path: metadata.name
-          value: mediamtx-http
+      - contains:
+          path: spec.ports
+          content:
+            name: hls
+            port: 8888
+            targetPort: hls
+            protocol: TCP
+      - contains:
+          path: spec.ports
+          content:
+            name: playback
+            port: 9996
+            targetPort: playback
+            protocol: TCP

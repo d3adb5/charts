@@ -1,0 +1,125 @@
+suite: ConfigMap
+
+templates:
+  - configmap.yaml
+
+tests:
+  - it: requires credentials for every action by default
+    release:
+      name: mediamtx
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'user: publisher'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'user: admin'
+      # No passwordless 'any' user is generated unless explicitly asked for.
+      - notMatchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'user: any'
+
+  - it: turns off the protocols MediaMTX would otherwise enable itself
+    release:
+      name: mediamtx
+    asserts:
+      # MediaMTX defaults moq to true; leaving it unmanaged would open 8892.
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'moq: false'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtsp: false'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'srt: true'
+
+  - it: derives listener addresses from the protocol ports
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        srt:
+          port: 9999
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'srtAddress: :9999'
+
+  - it: accepts permissions as plain strings or path-scoped maps
+    release:
+      name: mediamtx
+    set:
+      auth:
+        users:
+          - name: laptop
+            permissions:
+              - action: publish
+                path: laptop
+              - read
+            ips: ["203.0.113.0/24"]
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: '- action: publish\n\s+path: laptop'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: '- action: read'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: '203.0.113.0/24'
+
+  - it: renders anonymous entries as passwordless any-users
+    release:
+      name: mediamtx
+    set:
+      auth:
+        anonymous:
+          - permissions: [metrics]
+            ips: ["10.244.0.0/16"]
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'user: any'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: '10.244.0.0/16'
+
+  - it: lets mtxConfig supply keys the chart does not own
+    release:
+      name: mediamtx
+    set:
+      mtxConfig:
+        pathDefaults:
+          record: true
+        paths:
+          laptop: {}
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'record: true'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'laptop'
+
+  - it: refuses to render a server with no users at all
+    release:
+      name: mediamtx
+    set:
+      auth:
+        users: []
+        anonymous: []
+    asserts:
+      - failedTemplate:
+          errorPattern: 'would deny every request'
+
+  - it: refuses a user with no permissions
+    release:
+      name: mediamtx
+    set:
+      auth:
+        users:
+          - name: nobody
+    asserts:
+      - failedTemplate:
+          errorPattern: 'auth user "nobody" has no permissions'

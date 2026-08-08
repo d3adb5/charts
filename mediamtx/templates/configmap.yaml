@@ -1,3 +1,4 @@
+{{- include "mediamtx.validate" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,4 +7,4 @@ metadata:
     {{- include "mediamtx.labels" . | nindent 4 }}
 data:
   mediamtx.yml: |
-    {{- toYaml .Values.mtxConfig | nindent 4 }}
+    {{- include "mediamtx.config" . | nindent 4 }}

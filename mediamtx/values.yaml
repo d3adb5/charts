@@ -44,49 +44,169 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
-# MediaMTX configuration, rendered as-is into a ConfigMap and mounted as
-# /mediamtx.yml. Any option understood by MediaMTX can be set here; unset
-# options fall back to MediaMTX's own built-in defaults. See the reference
-# configuration file for the full list of available options:
+# Which protocols MediaMTX listens for. This block is the single source of
+# truth: it drives the listener config, the container ports, which of the two
+# Services below gets rendered, and what the Ingress may point at. Anything
+# disabled here opens no port at all.
+#
+# 'expose' publishes a port on the LoadBalancer Service. It only applies to
+# protocols that speak raw TCP/UDP, since those cannot be routed by an
+# Ingress. HTTP-based protocols always go on the ClusterIP Service instead and
+# reach the outside world through the Ingress at the bottom of this file.
+protocols:
+  # Low latency, UDP, and AES-encrypted by the protocol itself. The best way
+  # to publish from a phone or a desktop across the open internet, and the
+  # only publish path that works from a device with no reachable IP, since
+  # SRT callers dial out.
+  srt:
+    enabled: true
+    port: 8890
+    expose: true
+
+  # Browser playback (and OBS publishing via WHIP). Signalling is HTTP and is
+  # served on 'port' through the Ingress; media flows over 'icePort' as UDP
+  # and has to be published directly.
+  webrtc:
+    enabled: true
+    port: 8889
+    icePort: 8189
+    expose: true
+    # WebRTC hands clients a list of addresses to try. Behind a Service the
+    # pod only knows its cluster IP, which is useless to anyone outside, so
+    # the externally reachable address has to be advertised explicitly.
+    # Without this, browser playback from outside the cluster will not work.
+    additionalHosts: []
+    # - stream.example.com
+
+  # Control API, used to list active paths and to inspect/alter config at
+  # runtime. Requires credentials like everything else.
+  api:
+    enabled: true
+    port: 9997
+
+  # Prometheus metrics. Also authenticated: see the note on auth.anonymous if
+  # you would rather let an in-cluster scraper through unauthenticated.
+  metrics:
+    enabled: true
+    port: 9998
+
+  # Low latency and widely supported, but plain TCP with no transport
+  # encryption of its own; put it behind a trusted network or leave it off.
+  rtsp:
+    enabled: false
+    port: 8554
+    # Only listened on when mtxConfig.rtspTransports includes udp/multicast,
+    # in which case both are added to the Service automatically.
+    rtpPort: 8000
+    rtcpPort: 8001
+    expose: true
+
+  # Universally supported by streaming software, but TCP-bound and typically
+  # 1-3s behind. Off by default: SRT and WHIP are better on both counts.
+  rtmp:
+    enabled: false
+    port: 1935
+    expose: true
+
+  # Segmented playback. Works everywhere, at the cost of seconds of latency.
+  hls:
+    enabled: false
+    port: 8888
+
+  # Serves previously recorded segments. Needs mtxConfig.pathDefaults.record.
+  playback:
+    enabled: false
+    port: 9996
+
+  # Media over QUIC. MediaMTX enables this by default; the chart turns it off
+  # unless asked for, so it does not sit there as an unmanaged open port.
+  # Serves HTTP/2 (TCP) and HTTP/3 (UDP) on the same port number.
+  moq:
+    enabled: false
+    port: 8892
+    expose: false
+
+  # Go profiling endpoints. Debugging only.
+  pprof:
+    enabled: false
+    port: 9999
+
+# Authentication. MediaMTX ships wide open by default; this chart does not.
+# Every user below needs a password, which never lives in this file: it comes
+# from auth.sealed, an existing Secret, or is generated randomly.
+auth:
+  # Each user gets a password and a set of permissions. Actions are publish,
+  # read, playback, api, metrics and pprof. An action may be written as a
+  # plain string, or as a map to scope it to one path:
+  #
+  #   - name: laptop
+  #     permissions:
+  #       - action: publish
+  #         path: laptop    # may only publish to its own path
+  #       - read            # may read any path
+  #     ips: []             # optional source IP/CIDR allowlist
+  users:
+    - name: publisher
+      permissions:
+        - publish
+    - name: reader
+      permissions:
+        - read
+        - playback
+    - name: admin
+      permissions:
+        - api
+        - metrics
+
+  # Passwordless access, for the cases where credentials are impractical.
+  # Empty by default, which is what makes everything authenticated. Restrict
+  # anything added here by IP; an entry without 'ips' is open to the internet
+  # on every exposed listener.
+  anonymous: []
+    # Let an in-cluster Prometheus scrape without credentials:
+    # - permissions: [metrics]
+    #   ips: ["10.244.0.0/16"]
+
+  # An existing Secret with one key per user in auth.users, each holding that
+  # user's password. Mutually exclusive with auth.sealed.
+  existingSecret: ""
+
+  # Encrypted passwords, one key per user in auth.users, for clusters running
+  # Sealed Secrets. Values may be pasted across several lines; all whitespace
+  # is stripped before the SealedSecret is written. This is the option to use
+  # under Argo CD, where generated passwords cannot be stable (see below).
+  sealed: {}
+    # publisher: |
+    #   AgAAGQABhY2NvdW50X2lk...
+
+  # With neither of the above set, a Secret of random passwords is generated.
+  # Helm reuses the existing values on upgrade, but tools that render the
+  # chart without cluster access -- Argo CD among them -- cannot, and would
+  # produce a fresh password on every render. Either prefer auth.sealed there,
+  # or have Argo CD ignore the Secret's data (see the chart's Application
+  # example). Read a generated password back with:
+  #   kubectl get secret <release>-auth -o jsonpath='{.data.publisher}' | base64 -d
+  passwordLength: 32
+
+# MediaMTX configuration, merged under the keys generated from 'protocols' and
+# 'auth' above and mounted as /mediamtx.yml. Any option MediaMTX understands
+# can be set here; unset options fall back to its built-in defaults. See the
+# reference configuration file for the full list:
 # https://github.com/bluenviron/mediamtx/blob/main/mediamtx.yml
 mtxConfig:
   logLevel: info
   logDestinations: [stdout]
 
-  # Control API. Only reachable from localhost without authentication, so it
-  # is safe to enable by default; see mtxConfig.authInternalUsers to open it
-  # up further.
-  api: true
-  apiAddress: :9997
+  # Screen sharing bursts hard on scene changes. The default of 512 packets
+  # starts dropping frames on high-bitrate sources before the network is
+  # actually the problem.
+  writeQueueSize: 1024
 
-  # Prometheus-compatible metrics.
-  metrics: true
-  metricsAddress: :9998
-
-  rtsp: true
-  # UDP transports require the pod to be reachable on those ports directly
-  # (e.g. hostNetwork, see below), since a ClusterIP/LoadBalancer Service
-  # breaks the source IP/port matching RTSP relies on for UDP. TCP works
-  # fine through a regular Service and is the safer default.
+  # Only consulted when protocols.rtsp is enabled. UDP transports need the pod
+  # reachable on the RTP/RTCP ports directly (see hostNetwork below), because
+  # a Service breaks the source address matching RTSP relies on. TCP works
+  # through a normal Service and is the safer default.
   rtspTransports: [tcp]
-  rtspAddress: :8554
-
-  rtmp: true
-  rtmpAddress: :1935
-
-  hls: true
-  hlsAddress: :8888
-
-  webrtc: true
-  webrtcAddress: :8889
-  webrtcLocalUDPAddress: :8189
-  # Set this to the externally reachable IP(s)/hostname(s) of the server
-  # (e.g. a MetalLB LoadBalancer IP) so that WebRTC clients outside the
-  # cluster can complete the ICE handshake.
-  webrtcAdditionalHosts: []
-
-  srt: true
-  srtAddress: :8890
 
   pathDefaults: {}
     # record: true
@@ -94,110 +214,101 @@ mtxConfig:
   paths:
     all_others: {}
 
-# Additional environment variables injected into the container. Any
-# MediaMTX configuration key can also be overridden this way, by setting
-# MTX_ + the uppercased key name (e.g. MTX_WEBRTCADDITIONALHOSTS).
+# Additional environment variables injected into the container. Any MediaMTX
+# configuration key can also be overridden this way, by setting MTX_ + the
+# uppercased key name (e.g. MTX_WEBRTCADDITIONALHOSTS).
 env: []
 # - name: MTX_WEBRTCADDITIONALHOSTS
 #   value: "203.0.113.10"
 
-# Environment variables sourced from a Secret, meant for values that
-# shouldn't live in plain values.yaml (e.g. MTX_AUTHINTERNALUSERS0_PASS).
+# Environment variables sourced from a Secret, for MediaMTX settings that are
+# themselves secrets. Per-path SRT encryption passphrases are the main use:
+# MTX_PATHS_<PATHNAME>_SRTPUBLISHPASSPHRASE (uppercased path name) adds AES
+# encryption on top of the credentials configured under 'auth'.
 secretEnv:
   # If you have an existing Secret with your environment variables, name it
   # here. All other settings under 'secretEnv' will be ignored if you use
   # this.
   existingSecret: ""
   # If you have deployed Sealed Secrets, you can place encrypted values here
-  # instead.
+  # instead. Values may span several lines; whitespace is stripped.
   sealed: {}
     # Example:
-    # MTX_AUTHINTERNALUSERS0_PASS: "AgAAGQABhY2NvdW50X2lk..."
+    # MTX_PATHS_LAPTOP_SRTPUBLISHPASSPHRASE: "AgAAGQABhY2NvdW50X2lk..."
 
 # Use the host's network namespace instead of the pod network. This is the
 # only reliable way to get UDP-based RTSP transport working (see
-# mtxConfig.rtspTransports above), and can also help WebRTC/SRT NAT
-# traversal on single-node clusters. Not compatible with running more than
-# one replica per node.
+# mtxConfig.rtspTransports above), and can also help WebRTC/SRT NAT traversal
+# on single-node clusters. Not compatible with running more than one replica
+# per node.
 hostNetwork: false
 # Only applied when hostNetwork is true.
 dnsPolicy: ClusterFirstWithHostNet
 
-# Non-HTTP ports (raw RTSP/RTMP/SRT/WebRTC-ICE). These can't be routed
-# through an Ingress, so they get their own Service, defaulting to
-# LoadBalancer so they're directly reachable from outside the cluster (e.g.
-# via MetalLB on a bare-metal/Talos cluster).
+# Service for the raw TCP/UDP listeners marked 'expose' under 'protocols'.
+# These cannot be routed through an Ingress, so this defaults to LoadBalancer
+# to make them directly reachable (e.g. via MetalLB on a bare-metal cluster).
+# Not rendered at all when nothing is exposed.
 service:
   type: LoadBalancer
   annotations: {}
-  # Only relevant for LoadBalancer/NodePort Services: routes traffic
-  # directly to the node that received it, preserving the client source IP.
-  # Recommended here since ICE negotiation and SRT depend on a stable
-  # source address, and UDP in general doesn't survive SNAT well.
+    # metallb.io/loadBalancerIPs: "192.168.1.40"
+  # Only relevant for LoadBalancer/NodePort Services: routes traffic directly
+  # to the node that received it, preserving the client source IP. Recommended
+  # here since ICE negotiation and SRT depend on a stable source address, and
+  # UDP in general does not survive SNAT well.
   externalTrafficPolicy: Local
-  # Ports are only added to the container/Service when the corresponding
-  # protocol is enabled in mtxConfig above; the port number itself is taken
-  # from the matching mtxConfig *Address field.
-  ports:
-    rtsp:
-      enabled: true
-    rtmp:
-      enabled: true
-    webrtcIce:
-      enabled: true
-    srt:
-      enabled: true
 
-# HTTP-based ports (HLS playback, WebRTC signaling, control API, metrics).
-# Kept on a separate, ClusterIP-by-default Service so it can be fronted by
-# the Ingress below instead of being exposed directly.
+# Service for the HTTP-based listeners under 'protocols'. Kept separate and
+# ClusterIP by default so it can be fronted by the Ingress below rather than
+# exposed directly. Not rendered when no HTTP protocol is enabled.
 httpService:
   type: ClusterIP
   annotations: {}
   externalTrafficPolicy: ""
-  ports:
-    hls:
-      enabled: true
-    webrtc:
-      enabled: true
-    api:
-      enabled: false
-    metrics:
-      enabled: true
 
-# Ingress for httpService, above. Terminates TLS at the controller (plain
-# HTTP is forwarded to MediaMTX) when ingress.tls.enabled is set.
-# RTSP/RTMP/SRT/WebRTC-ICE are raw TCP/UDP protocols and cannot be routed
-# through an Ingress; they're exposed via the LoadBalancer Service instead.
+# Ingress for httpService, above. Terminates TLS at the controller and
+# forwards plain HTTP to MediaMTX when ingress.tls.enabled is set.
 ingress:
   enabled: false
   className: ""
   annotations: {}
     # kubernetes.io/tls-acme: "true"
     # cert-manager.io/cluster-issuer: letsencrypt
-  # Which port on httpService to route to. One of: hls, webrtc, api, metrics.
-  portName: hls
   # host: example.com
+  # Where each URL prefix goes. Each portName must be an enabled HTTP protocol
+  # (webrtc, hls, api, metrics, playback, pprof), and more specific prefixes
+  # have to come first. MediaMTX serves its control API under /v3 and its
+  # WebRTC pages under /<stream path>, so the two coexist on a single host.
+  routes:
+    - path: /
+      pathType: Prefix
+      portName: webrtc
+    # - path: /v3
+    #   pathType: Prefix
+    #   portName: api
   tls:
     enabled: false
     # secretName: chart-example-tls
 
 # Recordings are always mounted at /recordings, matching the default
-# recordPath (./recordings/...) in mtxConfig.pathDefaults. Enable
-# persistence to keep recordings across pod restarts.
+# recordPath (./recordings/...) in mtxConfig.pathDefaults. Enable persistence
+# to keep recordings across pod restarts.
 persistence:
   enabled: false
   size: 10Gi
   storageClass: ""
   accessMode: ReadWriteOnce
 
-# Must reference a port that is actually enabled in mtxConfig above.
+# Must name a port that an enabled protocol actually provides; the chart fails
+# to render otherwise. MediaMTX has no unauthenticated health endpoint, so
+# these are TCP connects rather than HTTP probes.
 livenessProbe:
   tcpSocket:
-    port: rtsp
+    port: api
 readinessProbe:
   tcpSocket:
-    port: rtsp
+    port: api
 
 # Additional volumes on the output StatefulSet definition.
 extraVolumes: []

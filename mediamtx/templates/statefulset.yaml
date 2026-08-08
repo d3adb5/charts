@@ -1,3 +1,4 @@
+{{- include "mediamtx.validate" . }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -13,7 +14,12 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ toYaml .Values.mtxConfig | sha256sum }}
+        {{- /*
+          Passwords are deliberately left out of this checksum: they are read
+          from a Secret at startup, and hashing generated ones would roll the
+          pod on every render.
+        */}}
+        checksum/config: {{ include "mediamtx.config" . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -40,8 +46,23 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: {{ include "mediamtx.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if or .Values.auth.users .Values.env }}
           env:
-            {{- toYaml .Values.env | nindent 12 }}
+            {{- /*
+              MediaMTX overrides list entries by index, so the order here has
+              to match the order authInternalUsers is generated in.
+            */}}
+            {{- range $index, $user := .Values.auth.users }}
+            - name: MTX_AUTHINTERNALUSERS_{{ $index }}_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mediamtx.authSecretName" $ }}
+                  key: {{ $user.name }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
           {{- if .Values.secretEnv.existingSecret }}
           envFrom:
             - secretRef:
@@ -52,45 +73,10 @@ spec:
                 name: {{ include "mediamtx.fullname" . }}-env
           {{- end }}
           ports:
-            {{- if .Values.mtxConfig.rtsp }}
-            - name: rtsp
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.rtspAddress }}
-              protocol: TCP
-            {{- end }}
-            {{- if .Values.mtxConfig.rtmp }}
-            - name: rtmp
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.rtmpAddress }}
-              protocol: TCP
-            {{- end }}
-            {{- if .Values.mtxConfig.hls }}
-            - name: hls
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.hlsAddress }}
-              protocol: TCP
-            {{- end }}
-            {{- if .Values.mtxConfig.webrtc }}
-            - name: webrtc
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.webrtcAddress }}
-              protocol: TCP
-            {{- if .Values.mtxConfig.webrtcLocalUDPAddress }}
-            - name: webrtc-ice
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.webrtcLocalUDPAddress }}
-              protocol: UDP
-            {{- end }}
-            {{- end }}
-            {{- if .Values.mtxConfig.srt }}
-            - name: srt
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.srtAddress }}
-              protocol: UDP
-            {{- end }}
-            {{- if .Values.mtxConfig.api }}
-            - name: api
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.apiAddress }}
-              protocol: TCP
-            {{- end }}
-            {{- if .Values.mtxConfig.metrics }}
-            - name: metrics
-              containerPort: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.metricsAddress }}
-              protocol: TCP
+            {{- range include "mediamtx.ports" . | fromYamlArray }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: {{ .protocol }}
             {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:

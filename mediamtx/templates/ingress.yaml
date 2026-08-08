@@ -1,8 +1,10 @@
 {{- if .Values.ingress.enabled -}}
-{{- $portAddresses := dict "hls" .Values.mtxConfig.hlsAddress "webrtc" .Values.mtxConfig.webrtcAddress "api" .Values.mtxConfig.apiAddress "metrics" .Values.mtxConfig.metricsAddress }}
-{{- $address := get $portAddresses .Values.ingress.portName }}
-{{- if not $address }}
-{{- fail "ingress.portName must be one of: hls, webrtc, api, metrics" }}
+{{- $ports := include "mediamtx.httpPorts" . | fromYamlArray }}
+{{- $byName := dict }}
+{{- $names := list }}
+{{- range $ports }}
+{{- $_ := set $byName .name .port }}
+{{- $names = append $names .name }}
 {{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -24,11 +26,16 @@ spec:
     - host: {{ quote .Values.ingress.host }}
       http:
         paths:
-          - path: /
-            pathType: Prefix
+          {{- range .Values.ingress.routes }}
+          {{- if not (hasKey $byName .portName) }}
+          {{- fail (printf "ingress route %q names port %q, which is not an enabled HTTP protocol (available: %s)" .path .portName (join ", " $names)) }}
+          {{- end }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ include "mediamtx.fullname" . }}-http
+                name: {{ include "mediamtx.fullname" $ }}-http
                 port:
-                  number: {{ include "mediamtx.portFromAddress" $address }}
+                  number: {{ get $byName .portName }}
+          {{- end }}
 {{- end }}

@@ -1,3 +1,5 @@
+{{- $ports := include "mediamtx.httpPorts" . | fromYamlArray }}
+{{- if $ports }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -12,29 +14,12 @@ spec:
   externalTrafficPolicy: {{ . }}
   {{- end }}
   ports:
-    {{- if and .Values.mtxConfig.hls .Values.httpService.ports.hls.enabled }}
-    - name: hls
-      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.hlsAddress }}
-      targetPort: hls
-      protocol: TCP
-    {{- end }}
-    {{- if and .Values.mtxConfig.webrtc .Values.httpService.ports.webrtc.enabled }}
-    - name: webrtc
-      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.webrtcAddress }}
-      targetPort: webrtc
-      protocol: TCP
-    {{- end }}
-    {{- if and .Values.mtxConfig.api .Values.httpService.ports.api.enabled }}
-    - name: api
-      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.apiAddress }}
-      targetPort: api
-      protocol: TCP
-    {{- end }}
-    {{- if and .Values.mtxConfig.metrics .Values.httpService.ports.metrics.enabled }}
-    - name: metrics
-      port: {{ include "mediamtx.portFromAddress" .Values.mtxConfig.metricsAddress }}
-      targetPort: metrics
-      protocol: TCP
+    {{- range $ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .name }}
+      protocol: {{ .protocol }}
     {{- end }}
   selector:
     {{- include "mediamtx.selectorLabels" . | nindent 4 }}
+{{- end }}
