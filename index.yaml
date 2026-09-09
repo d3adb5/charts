@@ -33,6 +33,17 @@ entries:
     version: 0.1.0
   mediamtx:
   - apiVersion: v2
+    appVersion: 1.21.0
+    created: "2026-09-09T09:40:08.098280401Z"
+    description: Ready-to-use media server and media proxy for SRT, WebRTC, RTSP,
+      RTMP and HLS
+    digest: 17a58dcb258f378d9dba51bd1e66a4b4f29631a6084befbc5b6c781bcb445427
+    name: mediamtx
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/mediamtx-0.3.0/mediamtx-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v2
     appVersion: 1.19.2
     created: "2026-08-08T00:25:30.630092062Z"
     description: Ready-to-use media server and media proxy for SRT, WebRTC, RTSP,
@@ -183,4 +194,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2026-08-08T00:25:30.630119594Z"
+generated: "2026-09-09T09:40:08.098311036Z"
