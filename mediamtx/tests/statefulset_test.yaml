@@ -246,3 +246,93 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: 'probe references port "api", which no enabled protocol provides'
+
+  - it: listens only on RTSPS when RTSP encryption is strict
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: strict}
+      serverTLS:
+        secretName: stream-tls
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: rtsps
+            containerPort: 8322
+            protocol: TCP
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: rtsp
+            containerPort: 8554
+            protocol: TCP
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: srtp
+            containerPort: 8004
+            protocol: UDP
+
+  - it: adds the SRTP/SRTCP pair only when RTSPS uses a UDP transport
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: strict}
+      serverTLS:
+        secretName: stream-tls
+      mtxConfig:
+        rtspTransports: [tcp, udp]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: srtp
+            containerPort: 8004
+            protocol: UDP
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: srtcp
+            containerPort: 8005
+            protocol: UDP
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: rtp
+            containerPort: 8000
+            protocol: UDP
+
+  - it: mounts the server certificate as a directory, so renewals reach it
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: strict}
+      serverTLS:
+        secretName: stream-tls
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: server-tls
+            secret:
+              secretName: stream-tls
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: server-tls
+            mountPath: /certs
+            readOnly: true
+
+  - it: mounts no certificate when none is named
+    release:
+      name: mediamtx
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: server-tls
+          any: true

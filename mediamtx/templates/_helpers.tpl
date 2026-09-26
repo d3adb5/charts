@@ -71,6 +71,27 @@ provided (existing / sealed / generated).
 {{- end }}
 
 {{/*
+protocols.rtsp.encryption as MediaMTX spells it. A bare `no` in YAML is the
+boolean false, and MediaMTX itself reads true as "strict", so both booleans
+are accepted here rather than rendering "false" into a config key.
+*/}}
+{{- define "mediamtx.rtspEncryption" -}}
+{{- $value := .Values.protocols.rtsp.encryption -}}
+{{- if kindIs "bool" $value -}}
+{{- ternary "strict" "no" $value -}}
+{{- else -}}
+{{- default "no" $value -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Where serverTLS.secretName is mounted.
+*/}}
+{{- define "mediamtx.serverTLSDir" -}}
+/certs
+{{- end }}
+
+{{/*
 Every listener the chart knows about, as a YAML list of
 
   - name:     container/Service port name
@@ -86,12 +107,25 @@ Ingress backend, so a protocol is only ever enabled in one place.
 {{- $p := .Values.protocols -}}
 {{- $ports := list -}}
 {{- if $p.rtsp.enabled -}}
-  {{- $ports = append $ports (dict "name" "rtsp" "port" (int $p.rtsp.port) "protocol" "TCP" "kind" "raw" "expose" (default false $p.rtsp.expose)) -}}
-  {{/* UDP transports need the RTP/RTCP pair alongside the control port. */}}
+  {{- $encryption := include "mediamtx.rtspEncryption" . -}}
+  {{- $expose := default false $p.rtsp.expose -}}
+  {{/* UDP transports need a media pair alongside the control port. */}}
   {{- $transports := default (list "tcp") .Values.mtxConfig.rtspTransports -}}
-  {{- if or (has "udp" $transports) (has "multicast" $transports) -}}
-    {{- $ports = append $ports (dict "name" "rtp" "port" (int $p.rtsp.rtpPort) "protocol" "UDP" "kind" "raw" "expose" (default false $p.rtsp.expose)) -}}
-    {{- $ports = append $ports (dict "name" "rtcp" "port" (int $p.rtsp.rtcpPort) "protocol" "UDP" "kind" "raw" "expose" (default false $p.rtsp.expose)) -}}
+  {{- $udp := or (has "udp" $transports) (has "multicast" $transports) -}}
+  {{/* "strict" is the one mode in which nothing plain listens. */}}
+  {{- if ne $encryption "strict" -}}
+    {{- $ports = append $ports (dict "name" "rtsp" "port" (int $p.rtsp.port) "protocol" "TCP" "kind" "raw" "expose" $expose) -}}
+    {{- if $udp -}}
+      {{- $ports = append $ports (dict "name" "rtp" "port" (int $p.rtsp.rtpPort) "protocol" "UDP" "kind" "raw" "expose" $expose) -}}
+      {{- $ports = append $ports (dict "name" "rtcp" "port" (int $p.rtsp.rtcpPort) "protocol" "UDP" "kind" "raw" "expose" $expose) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if ne $encryption "no" -}}
+    {{- $ports = append $ports (dict "name" "rtsps" "port" (int $p.rtsp.tlsPort) "protocol" "TCP" "kind" "raw" "expose" $expose) -}}
+    {{- if $udp -}}
+      {{- $ports = append $ports (dict "name" "srtp" "port" (int $p.rtsp.srtpPort) "protocol" "UDP" "kind" "raw" "expose" $expose) -}}
+      {{- $ports = append $ports (dict "name" "srtcp" "port" (int $p.rtsp.srtcpPort) "protocol" "UDP" "kind" "raw" "expose" $expose) -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 {{- if $p.rtmp.enabled -}}
@@ -207,9 +241,20 @@ authInternalUsers:
   {{- include "mediamtx.authInternalUsers" . | nindent 2 }}
 rtsp: {{ $p.rtsp.enabled }}
 {{- if $p.rtsp.enabled }}
+{{- $encryption := include "mediamtx.rtspEncryption" . }}
+rtspEncryption: {{ $encryption | quote }}
 rtspAddress: ":{{ $p.rtsp.port }}"
 rtpAddress: ":{{ $p.rtsp.rtpPort }}"
 rtcpAddress: ":{{ $p.rtsp.rtcpPort }}"
+{{- if ne $encryption "no" }}
+rtspsAddress: ":{{ $p.rtsp.tlsPort }}"
+srtpAddress: ":{{ $p.rtsp.srtpPort }}"
+srtcpAddress: ":{{ $p.rtsp.srtcpPort }}"
+{{- with .Values.serverTLS.secretName }}
+rtspServerCert: {{ include "mediamtx.serverTLSDir" $ }}/tls.crt
+rtspServerKey: {{ include "mediamtx.serverTLSDir" $ }}/tls.key
+{{- end }}
+{{- end }}
 {{- end }}
 rtmp: {{ $p.rtmp.enabled }}
 {{- if $p.rtmp.enabled }}
@@ -285,6 +330,21 @@ rejects everything, or a pod that never starts.
   {{- end -}}
   {{- if and $auth.sealed (not (hasKey $auth.sealed .name)) -}}
     {{- fail (printf "auth.sealed has no encrypted password for user %q" .name) -}}
+  {{- end -}}
+{{- end -}}
+{{- if .Values.protocols.rtsp.enabled -}}
+  {{- $encryption := include "mediamtx.rtspEncryption" . -}}
+  {{- if not (has $encryption (list "no" "strict" "optional")) -}}
+    {{- fail (printf "protocols.rtsp.encryption must be \"no\", \"strict\" or \"optional\", not %q" $encryption) -}}
+  {{- end -}}
+  {{- /*
+    MediaMTX does not generate a certificate for RTSPS the way it does for
+    MoQ: with none it refuses to start. Say so here instead of in a
+    CrashLoopBackOff.
+  */ -}}
+  {{- $own := and .Values.mtxConfig.rtspServerCert .Values.mtxConfig.rtspServerKey -}}
+  {{- if and (ne $encryption "no") (not .Values.serverTLS.secretName) (not $own) -}}
+    {{- fail (printf "protocols.rtsp.encryption %q needs a certificate: set serverTLS.secretName to a kubernetes.io/tls Secret, or mtxConfig.rtspServerCert and rtspServerKey" $encryption) -}}
   {{- end -}}
 {{- end -}}
 {{- $names := list -}}

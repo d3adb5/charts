@@ -95,6 +95,15 @@ spec:
               readOnly: true
             - name: recordings
               mountPath: /recordings
+            {{- if .Values.serverTLS.secretName }}
+            {{- /*
+              A directory, never subPath: subPath is a copy taken at start and
+              never sees a renewal, and MediaMTX reloads the files itself.
+            */}}
+            - name: server-tls
+              mountPath: {{ include "mediamtx.serverTLSDir" . }}
+              readOnly: true
+            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -105,6 +114,11 @@ spec:
         {{- if not .Values.persistence.enabled }}
         - name: recordings
           emptyDir: {}
+        {{- end }}
+        {{- with .Values.serverTLS.secretName }}
+        - name: server-tls
+          secret:
+            secretName: {{ . }}
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

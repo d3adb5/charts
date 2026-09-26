@@ -123,3 +123,75 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: 'auth user "nobody" has no permissions'
+
+  - it: configures RTSPS with the mounted certificate when encryption is strict
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: strict, tlsPort: 9322}
+      serverTLS:
+        secretName: stream-tls
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspEncryption: strict'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspsAddress: :9322'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspServerCert: /certs/tls.crt'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspServerKey: /certs/tls.key'
+
+  - it: renders a bare YAML no as the string MediaMTX expects
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: false}
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspEncryption: "no"'
+      - notMatchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspsAddress'
+
+  - it: leaves the certificate paths to mtxConfig when no Secret is named
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: strict}
+      mtxConfig:
+        rtspServerCert: /elsewhere/server.crt
+        rtspServerKey: /elsewhere/server.key
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspServerCert: /elsewhere/server.crt'
+
+  - it: refuses RTSPS with no certificate, rather than a pod that will not start
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: strict}
+    asserts:
+      - failedTemplate:
+          errorPattern: 'protocols.rtsp.encryption "strict" needs a certificate'
+
+  - it: refuses an encryption mode MediaMTX does not have
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: always}
+      serverTLS:
+        secretName: stream-tls
+    asserts:
+      - failedTemplate:
+          errorPattern: 'must be "no", "strict" or "optional", not "always"'

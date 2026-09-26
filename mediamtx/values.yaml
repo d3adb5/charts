@@ -90,15 +90,30 @@ protocols:
     enabled: true
     port: 9998
 
-  # Low latency and widely supported, but plain TCP with no transport
-  # encryption of its own; put it behind a trusted network or leave it off.
+  # Low latency and understood by every desktop player (mpv, VLC, ffplay).
+  # Plain RTSP has no encryption of its own and sends credentials in the
+  # clear, so outside a trusted network use its TLS variant, RTSPS.
+  # 'encryption' decides which of the two listens:
+  #
+  #   "no"        plain RTSP on 'port', and nothing else
+  #   "strict"    RTSPS on 'tlsPort', and nothing plain listens at all
+  #   "optional"  both
+  #
+  # Anything but "no" needs a certificate: see serverTLS below. Quote the
+  # value -- a bare no is a YAML boolean -- though the chart accepts it.
   rtsp:
     enabled: false
+    encryption: "no"
     port: 8554
+    tlsPort: 8322
     # Only listened on when mtxConfig.rtspTransports includes udp/multicast,
-    # in which case both are added to the Service automatically.
+    # in which case they are added to the Service automatically: RTP/RTCP for
+    # plain RTSP, SRTP/SRTCP for RTSPS. With TCP alone -- the default -- media
+    # is interleaved on the one connection and none of these exist.
     rtpPort: 8000
     rtcpPort: 8001
+    srtpPort: 8004
+    srtcpPort: 8005
     expose: true
 
   # Universally supported by streaming software, but TCP-bound and typically
@@ -235,6 +250,23 @@ secretEnv:
   sealed: {}
     # Example:
     # MTX_PATHS_LAPTOP_SRTPUBLISHPASSPHRASE: "AgAAGQABhY2NvdW50X2lk..."
+
+# Certificate for the listeners MediaMTX encrypts itself rather than leaving
+# to the Ingress -- RTSPS, which is not HTTP and cannot go through one. Name a
+# kubernetes.io/tls Secret, such as the one cert-manager fills for
+# ingress.host, and it is mounted at /certs and wired into every listener that
+# needs it. Clients verify it against the name they dialled, so it has to be
+# the certificate for the host clients use.
+#
+# The Secret is mounted as a directory and never through subPath: a subPath
+# mount is a copy taken at pod start and never sees a renewal. As a directory
+# it follows the Secret, and MediaMTX watches the files and swaps a renewed
+# certificate in without a restart.
+#
+# Leave it empty to supply rtspServerCert/rtspServerKey yourself through
+# mtxConfig and extraVolumes instead.
+serverTLS:
+  secretName: ""
 
 # Use the host's network namespace instead of the pod network. This is the
 # only reliable way to get UDP-based RTSP transport working (see

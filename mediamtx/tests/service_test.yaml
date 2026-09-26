@@ -116,3 +116,45 @@ tests:
       - equal:
           path: metadata.annotations["metallb.io/loadBalancerIPs"]
           value: "192.168.1.40"
+
+  - it: publishes only the RTSPS port when RTSP encryption is strict
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: strict, expose: true}
+        srt: {enabled: false}
+        webrtc: {enabled: false}
+      serverTLS:
+        secretName: stream-tls
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - name: rtsps
+              port: 8322
+              targetPort: rtsps
+              protocol: TCP
+
+  - it: publishes both RTSP and RTSPS when encryption is optional
+    release:
+      name: mediamtx
+    set:
+      protocols:
+        rtsp: {enabled: true, encryption: optional, expose: true}
+        srt: {enabled: false}
+        webrtc: {enabled: false}
+      serverTLS:
+        secretName: stream-tls
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - name: rtsp
+              port: 8554
+              targetPort: rtsp
+              protocol: TCP
+            - name: rtsps
+              port: 8322
+              targetPort: rtsps
+              protocol: TCP
