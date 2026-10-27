@@ -1,0 +1,162 @@
+suite: mtx-gate sidecar
+
+templates:
+  - configmap.yaml
+  - statefulset.yaml
+  - service.yaml
+  - service-http.yaml
+
+release:
+  name: mediamtx
+
+set:
+  protocols:
+    rtsp: {enabled: true, encryption: strict, tlsPort: 8322, expose: true}
+    api: {enabled: true}
+  serverTLS: {secretName: tls}
+  auth:
+    users:
+      - name: beaver
+      - name: eevee
+      - name: admin
+  gate:
+    enabled: true
+    owners: {beaver: [beaver, beaver-phone], eevee: [eevee]}
+    admins: [admin]
+    trustedProxies: [10.244.0.0/16]
+
+tests:
+  - it: hands every auth decision to the gate and moves RTSPS behind it
+    template: configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'authMethod: http'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'authHTTPAddress: http://127.0.0.1:9000/auth'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'authInternalUsers: \[\]'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'rtspsAddress: 127.0.0.1:18322'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: "rtspTrustedProxies:\n- 127.0.0.1"
+      - matchRegex:
+          path: data["gate.json"]
+          pattern: '"proxyListen": ":8322"'
+      - matchRegex:
+          path: data["gate.json"]
+          pattern: '"proxyTarget": "127.0.0.1:18322"'
+
+  - it: keeps internal users when the gate is off
+    template: configmap.yaml
+    set:
+      gate.enabled: false
+      auth.users:
+        - {name: beaver, permissions: [read]}
+    asserts:
+      - notMatchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'authMethod'
+      - matchRegex:
+          path: data["mediamtx.yml"]
+          pattern: 'user: beaver'
+      - notExists:
+          path: data["gate.json"]
+
+  - it: gives the public RTSPS port to the gate container, not MediaMTX
+    template: statefulset.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content: {name: rtsps, containerPort: 8322, protocol: TCP}
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: gate
+      - equal:
+          path: spec.template.spec.containers[1].ports
+          value:
+            - {name: rtsps, containerPort: 8322, protocol: TCP}
+            - {name: gate, containerPort: 9080, protocol: TCP}
+      - equal:
+          path: spec.template.spec.containers[1].args
+          value: [-config=/etc/mtx-gate/config.json]
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.readOnlyRootFilesystem
+          value: true
+
+  - it: passes no internal-user passwords to MediaMTX
+    template: statefulset.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].env
+
+  - it: mounts the auth Secret as the gate's password files
+    template: statefulset.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: gate-passwords
+            secret: {secretName: mediamtx-auth}
+      - contains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content: {name: gate-passwords, mountPath: /etc/mtx-gate/passwords, readOnly: true}
+
+  - it: enforces only when asked
+    template: statefulset.yaml
+    set:
+      gate.enforce: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].args
+          value: [-config=/etc/mtx-gate/config.json, -enforce]
+
+  - it: still exposes RTSPS on the LoadBalancer, now targeting the gate
+    template: service.yaml
+    asserts:
+      - contains:
+          path: spec.ports
+          content: {name: rtsps, port: 8322, targetPort: rtsps, protocol: TCP}
+
+  - it: puts the gate API on the HTTP Service
+    template: service-http.yaml
+    asserts:
+      - contains:
+          path: spec.ports
+          content: {name: gate, port: 9080, targetPort: gate, protocol: TCP}
+
+  - it: refuses owners that aren't users
+    template: statefulset.yaml
+    set:
+      gate.owners: {mallory: [x]}
+    asserts:
+      - failedTemplate:
+          errorPattern: 'gate.owners names "mallory"'
+
+  - it: refuses anonymous access with the gate
+    template: statefulset.yaml
+    set:
+      auth.anonymous: [{permissions: [read]}]
+    asserts:
+      - failedTemplate:
+          errorPattern: 'no anonymous access'
+
+  - it: needs the API for kicks and liveness
+    template: statefulset.yaml
+    set:
+      protocols.api.enabled: false
+    asserts:
+      - failedTemplate:
+          errorPattern: 'needs protocols.api'
+
+  - it: fronts strict RTSPS only
+    template: statefulset.yaml
+    set:
+      protocols.rtsp.encryption: optional
+    asserts:
+      - failedTemplate:
+          errorPattern: 'fronts RTSPS only'

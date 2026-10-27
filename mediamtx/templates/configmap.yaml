@@ -8,3 +8,7 @@ metadata:
 data:
   mediamtx.yml: |
     {{- include "mediamtx.config" . | nindent 4 }}
+  {{- if .Values.gate.enabled }}
+  gate.json: |
+    {{- include "mediamtx.gateConfig" . | nindent 4 }}
+  {{- end }}

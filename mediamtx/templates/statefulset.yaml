@@ -19,7 +19,7 @@ spec:
           from a Secret at startup, and hashing generated ones would roll the
           pod on every render.
         */}}
-        checksum/config: {{ include "mediamtx.config" . | sha256sum }}
+        checksum/config: {{ printf "%s%s" (include "mediamtx.config" .) (ternary (include "mediamtx.gateConfig" .) "" .Values.gate.enabled) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -46,18 +46,21 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: {{ include "mediamtx.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if or .Values.auth.users .Values.env }}
+          {{- $internalUsers := and .Values.auth.users (not .Values.gate.enabled) }}
+          {{- if or $internalUsers .Values.env }}
           env:
             {{- /*
               MediaMTX overrides list entries by index, so the order here has
               to match the order authInternalUsers is generated in.
             */}}
+            {{- if $internalUsers }}
             {{- range $index, $user := .Values.auth.users }}
             - name: MTX_AUTHINTERNALUSERS_{{ $index }}_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ include "mediamtx.authSecretName" $ }}
                   key: {{ $user.name }}
+            {{- end }}
             {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
@@ -74,9 +77,11 @@ spec:
           {{- end }}
           ports:
             {{- range include "mediamtx.ports" . | fromYamlArray }}
+            {{- if ne (.container | default "mediamtx") "gate" }}
             - name: {{ .name }}
               containerPort: {{ .port }}
               protocol: {{ .protocol }}
+            {{- end }}
             {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
@@ -107,10 +112,50 @@ spec:
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+        {{- with .Values.gate }}
+        {{- if .enabled }}
+        - name: gate
+          securityContext:
+            {{- toYaml .securityContext | nindent 12 }}
+          image: "{{ .image.repository }}:{{ .image.tag }}"
+          imagePullPolicy: {{ .image.pullPolicy }}
+          args:
+            - -config=/etc/mtx-gate/config.json
+            {{- if .enforce }}
+            - -enforce
+            {{- end }}
+          ports:
+            {{- range include "mediamtx.ports" $ | fromYamlArray }}
+            {{- if eq (.container | default "mediamtx") "gate" }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: {{ .protocol }}
+            {{- end }}
+            {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: gate
+          resources:
+            {{- toYaml .resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mtx-gate/config.json
+              subPath: gate.json
+              readOnly: true
+            - name: gate-passwords
+              mountPath: /etc/mtx-gate/passwords
+              readOnly: true
+        {{- end }}
+        {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "mediamtx.fullname" . }}
+        {{- if .Values.gate.enabled }}
+        - name: gate-passwords
+          secret:
+            secretName: {{ include "mediamtx.authSecretName" . }}
+        {{- end }}
         {{- if not .Values.persistence.enabled }}
         - name: recordings
           emptyDir: {}

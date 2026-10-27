@@ -121,7 +121,7 @@ Ingress backend, so a protocol is only ever enabled in one place.
     {{- end -}}
   {{- end -}}
   {{- if ne $encryption "no" -}}
-    {{- $ports = append $ports (dict "name" "rtsps" "port" (int $p.rtsp.tlsPort) "protocol" "TCP" "kind" "raw" "expose" $expose) -}}
+    {{- $ports = append $ports (dict "name" "rtsps" "port" (int $p.rtsp.tlsPort) "protocol" "TCP" "kind" "raw" "expose" $expose "container" (ternary "gate" "mediamtx" .Values.gate.enabled)) -}}
     {{- if $udp -}}
       {{- $ports = append $ports (dict "name" "srtp" "port" (int $p.rtsp.srtpPort) "protocol" "UDP" "kind" "raw" "expose" $expose) -}}
       {{- $ports = append $ports (dict "name" "srtcp" "port" (int $p.rtsp.srtcpPort) "protocol" "UDP" "kind" "raw" "expose" $expose) -}}
@@ -161,6 +161,9 @@ Ingress backend, so a protocol is only ever enabled in one place.
 {{- end -}}
 {{- if $p.pprof.enabled -}}
   {{- $ports = append $ports (dict "name" "pprof" "port" (int $p.pprof.port) "protocol" "TCP" "kind" "http" "expose" false) -}}
+{{- end -}}
+{{- if .Values.gate.enabled -}}
+  {{- $ports = append $ports (dict "name" "gate" "port" (int .Values.gate.port) "protocol" "TCP" "kind" "http" "expose" false "container" "gate") -}}
 {{- end -}}
 {{- toYaml $ports }}
 {{- end }}
@@ -237,8 +240,14 @@ The configuration keys the chart owns, derived from .Values.protocols and
 */}}
 {{- define "mediamtx.generatedConfig" -}}
 {{- $p := .Values.protocols }}
+{{- if .Values.gate.enabled }}
+authMethod: http
+authHTTPAddress: http://127.0.0.1:9000/auth
+authInternalUsers: []
+{{- else }}
 authInternalUsers:
   {{- include "mediamtx.authInternalUsers" . | nindent 2 }}
+{{- end }}
 rtsp: {{ $p.rtsp.enabled }}
 {{- if $p.rtsp.enabled }}
 {{- $encryption := include "mediamtx.rtspEncryption" . }}
@@ -247,7 +256,12 @@ rtspAddress: ":{{ $p.rtsp.port }}"
 rtpAddress: ":{{ $p.rtsp.rtpPort }}"
 rtcpAddress: ":{{ $p.rtsp.rtcpPort }}"
 {{- if ne $encryption "no" }}
+{{- if .Values.gate.enabled }}
+rtspsAddress: "127.0.0.1:{{ .Values.gate.rtspsInternalPort }}"
+rtspTrustedProxies: [127.0.0.1]
+{{- else }}
 rtspsAddress: ":{{ $p.rtsp.tlsPort }}"
+{{- end }}
 srtpAddress: ":{{ $p.rtsp.srtpPort }}"
 srtcpAddress: ":{{ $p.rtsp.srtcpPort }}"
 {{- with .Values.serverTLS.secretName }}
@@ -310,6 +324,19 @@ everything else.
 {{- end }}
 
 {{/*
+mtx-gate's config.json. Passwords are files in the auth Secret, mounted beside it.
+*/}}
+{{- define "mediamtx.gateConfig" -}}
+{{- $g := .Values.gate -}}
+{{- $c := dict "api" (printf ":%d" (int $g.port)) "auth" "127.0.0.1:9000" "passwordsDir" "/etc/mtx-gate/passwords"
+  "proxyListen" (printf ":%d" (int .Values.protocols.rtsp.tlsPort))
+  "proxyTarget" (printf "127.0.0.1:%d" (int $g.rtspsInternalPort))
+  "mtxAPI" (printf "http://127.0.0.1:%d" (int .Values.protocols.api.port))
+  "owners" $g.owners "admins" (default list $g.admins) "trustedProxies" (default list $g.trustedProxies) -}}
+{{- toPrettyJson $c }}
+{{- end }}
+
+{{/*
 Fail early on value combinations that would otherwise produce a server that
 rejects everything, or a pod that never starts.
 */}}
@@ -321,11 +348,40 @@ rejects everything, or a pod that never starts.
 {{- if not (or $auth.users $auth.anonymous) -}}
   {{- fail "auth.users and auth.anonymous are both empty: MediaMTX would deny every request. Define at least one user." -}}
 {{- end -}}
+{{- $gate := .Values.gate -}}
+{{- if $gate.enabled -}}
+  {{- $userNames := list -}}
+  {{- range $auth.users -}}
+    {{- $userNames = append $userNames .name -}}
+  {{- end -}}
+  {{- if $auth.anonymous -}}
+    {{- fail "gate.enabled: the gate has no anonymous access; empty auth.anonymous" -}}
+  {{- end -}}
+  {{- if not $gate.owners -}}
+    {{- fail "gate.enabled needs gate.owners: nobody could log in" -}}
+  {{- end -}}
+  {{- range $name, $_ := $gate.owners -}}
+    {{- if not (has $name $userNames) -}}
+      {{- fail (printf "gate.owners names %q, which is not in auth.users" $name) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $gate.admins -}}
+    {{- if not (has . $userNames) -}}
+      {{- fail (printf "gate.admins names %q, which is not in auth.users" .) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not .Values.protocols.api.enabled -}}
+    {{- fail "gate.enabled needs protocols.api: the gate ends sessions and checks liveness through it" -}}
+  {{- end -}}
+  {{- if and .Values.protocols.rtsp.enabled (ne (include "mediamtx.rtspEncryption" .) "strict") -}}
+    {{- fail "gate.enabled fronts RTSPS only: set protocols.rtsp.encryption to \"strict\"" -}}
+  {{- end -}}
+{{- end -}}
 {{- range $auth.users -}}
   {{- if not .name -}}
     {{- fail "every entry in auth.users needs a name" -}}
   {{- end -}}
-  {{- if not .permissions -}}
+  {{- if and (not .permissions) (not $gate.enabled) -}}
     {{- fail (printf "auth user %q has no permissions" .name) -}}
   {{- end -}}
   {{- if and $auth.sealed (not (hasKey $auth.sealed .name)) -}}

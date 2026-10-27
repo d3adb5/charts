@@ -203,6 +203,48 @@ auth:
   #   kubectl get secret <release>-auth -o jsonpath='{.data.publisher}' | base64 -d
   passwordLength: 32
 
+# mtx-gate (https://github.com/d3adb5/mtx-gate): a sidecar that takes over
+# every authentication decision (authMethod: http) and fronts RTSPS. A client
+# opens its IP over HTTPS with its login first; any other address gets a TCP
+# reset on the RTSPS port and a 404 on WHIP/WHEP (wire the gate's /forward in
+# as a Traefik forwardAuth). Webcam shares also need a ticket from the sender.
+# The users' passwords come from the same Secret as auth.users; 'permissions'
+# are not used while the gate is on, the gate's rules are.
+gate:
+  enabled: false
+  image:
+    repository: ghcr.io/d3adb5/mtx-gate
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  # Off: refusals are only counted (GET /stats on the loopback auth port), so
+  # old clients keep working while you watch the count. MediaMTX's API and
+  # metrics are always enforced.
+  enforce: false
+  # Gate API, browser watch page (/gate/v1/watch/) and forwardAuth (/forward).
+  # Added to httpService as port name "gate"; route /gate/v1 to it.
+  port: 9080
+  # Users who may log in to the gate, each with the fixed paths it publishes
+  # to. Every owner may read every owner's fixed paths. Names must be in
+  # auth.users.
+  owners: {}
+    # beaver: [beaver, beaver-phone]
+  # auth.users that may use MediaMTX's API and metrics.
+  admins: []
+  # Proxies whose X-Forwarded-For the gate believes: the Ingress controller.
+  trustedProxies: []
+    # - 10.244.0.0/16
+  # Where MediaMTX's own RTSPS listener moves to (loopback only); the gate
+  # listens on protocols.rtsp.tlsPort and forwards with PROXY protocol v2.
+  rtspsInternalPort: 18322
+  resources: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+
 # MediaMTX configuration, merged under the keys generated from 'protocols' and
 # 'auth' above and mounted as /mediamtx.yml. Any option MediaMTX understands
 # can be set here; unset options fall back to its built-in defaults. See the

@@ -1,0 +1,18 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.19.2
+    restart: unless-stopped
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+      - ./recordings:/recordings
+    ports:
+      - "8554:8554/tcp"   # RTSP
+      - "8000:8000/udp"   # RTP (RTSP UDP transport)
+      - "8001:8001/udp"   # RTCP (RTSP UDP transport)
+      - "1935:1935/tcp"   # RTMP
+      - "8888:8888/tcp"   # HLS
+      - "8889:8889/tcp"   # WebRTC (HTTP/WHIP/WHEP + web page)
+      - "8189:8189/udp"   # WebRTC ICE
+      - "8890:8890/udp"   # SRT
+      - "9997:9997/tcp"   # Control API
+      - "9998:9998/tcp"   # Metrics

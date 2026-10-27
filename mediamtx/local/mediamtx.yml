@@ -1,0 +1,45 @@
+# Local testing config, mirroring the defaults in ../values.yaml's
+# mtxConfig. Unlike the Kubernetes chart, UDP RTSP transport is left enabled
+# here since a single Docker host has no CNI/NAT to break it.
+logLevel: info
+
+api: true
+apiAddress: :9997
+
+metrics: true
+metricsAddress: :9998
+
+rtsp: true
+rtspTransports: [udp, tcp]
+rtspAddress: :8554
+
+rtmp: true
+rtmpAddress: :1935
+
+hls: true
+hlsAddress: :8888
+
+webrtc: true
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+
+srt: true
+srtAddress: :8890
+
+paths:
+  all_others: {}
+
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions: []
+
+  - user: argon2:$argon2id$v=19$m=4096,t=3,p=1$c2FsdEl0V2l0aFNhbHQ$HdWMMycVtSs0O4b+v5jpWFafueGxoSYSaTnL036PXK4
+    pass: argon2:$argon2id$v=19$m=4096,t=3,p=1$c2FsdEl0V2l0aFNhbHQ$HBTIqEgcvzsz/FjTImacJuAWMkwpTy2yCDLfyAhaQUc
+
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+
