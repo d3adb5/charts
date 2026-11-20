@@ -1,0 +1,8 @@
+apiVersion: v2
+name: qbittorrent
+description: A free and reliable P2P BitTorrent client
+type: application
+
+version: 0.1.0
+
+appVersion: "5.3.0"

@@ -1,0 +1,90 @@
+suite: StatefulSet
+
+templates:
+  - statefulset.yaml
+  - configmap.yaml
+
+tests:
+  - it: defaults the image tag to the app version
+    template: statefulset.yaml
+    release:
+      name: qbittorrent
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: lscr.io/linuxserver/qbittorrent:5.3.0
+
+  - it: passes service ports to the image
+    template: statefulset.yaml
+    release:
+      name: qbittorrent
+    set:
+      service.port: 9090
+      peerService.port: 32333
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEBUI_PORT
+            value: "9090"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TORRENTING_PORT
+            value: "32333"
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: peer-udp
+            containerPort: 32333
+            protocol: UDP
+
+  - it: does not mount the init script without config
+    template: statefulset.yaml
+    release:
+      name: qbittorrent
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: qbittorrent-init
+            mountPath: /custom-cont-init.d/50-apply-config.sh
+            subPath: apply-config.sh
+            readOnly: true
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/config"]
+
+  - it: mounts the init script when config is given
+    template: statefulset.yaml
+    release:
+      name: qbittorrent
+    set:
+      qbittorrent:
+        config:
+          WebUI:
+            AuthSubnetWhitelistEnabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: qbittorrent-init
+            mountPath: /custom-cont-init.d/50-apply-config.sh
+            subPath: apply-config.sh
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: qbittorrent-init
+            configMap:
+              name: qbittorrent-init
+              defaultMode: 0755
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+
+  - it: omits storageClassName unless set
+    template: statefulset.yaml
+    release:
+      name: qbittorrent
+    asserts:
+      - notExists:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName

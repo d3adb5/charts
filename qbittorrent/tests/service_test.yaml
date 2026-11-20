@@ -1,0 +1,43 @@
+suite: Service
+
+templates:
+  - service.yaml
+
+tests:
+  - it: exposes the peer port over TCP and UDP
+    release:
+      name: qbittorrent
+    documentIndex: 1
+    set:
+      peerService:
+        type: LoadBalancer
+        port: 32333
+        externalTrafficPolicy: Local
+    asserts:
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
+      - contains:
+          path: spec.ports
+          content:
+            port: 32333
+            targetPort: peer-tcp
+            protocol: TCP
+            name: peer-tcp
+      - contains:
+          path: spec.ports
+          content:
+            port: 32333
+            targetPort: peer-udp
+            protocol: UDP
+            name: peer-udp
+
+  - it: omits unset optional fields
+    release:
+      name: qbittorrent
+    asserts:
+      - notExists:
+          path: spec.externalTrafficPolicy
+        documentIndex: 1
+      - notExists:
+          path: spec.ports[0].nodePort

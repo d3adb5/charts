@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: lscr.io/linuxserver/qbittorrent
+  pullPolicy: IfNotPresent
+  tag: ""
+
+qbittorrent:
+  config: {}
+
+persistence:
+  config:
+    size: 1Gi
+    storageClass: ""
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+peerService:
+  type: ClusterIP
+  port: 6881
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  tls:
+    enabled: false
+
+resources: {}
+
+livenessProbe:
+  tcpSocket:
+    port: http
+readinessProbe:
+  tcpSocket:
+    port: http
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

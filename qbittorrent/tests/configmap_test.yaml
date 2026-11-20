@@ -1,0 +1,42 @@
+suite: ConfigMap
+
+templates:
+  - configmap.yaml
+
+tests:
+  - it: renders nothing without config
+    release:
+      name: qbittorrent
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: sets every configured key in its section
+    release:
+      name: qbittorrent
+    set:
+      qbittorrent:
+        config:
+          WebUI:
+            AuthSubnetWhitelistEnabled: true
+            AuthSubnetWhitelist: 10.244.0.0/16
+    asserts:
+      - matchRegex:
+          path: data["apply-config.sh"]
+          pattern: "set_key 'WebUI' 'AuthSubnetWhitelistEnabled' 'true'"
+      - matchRegex:
+          path: data["apply-config.sh"]
+          pattern: "set_key 'WebUI' 'AuthSubnetWhitelist' '10.244.0.0/16'"
+
+  - it: escapes single quotes and keeps backslashes
+    release:
+      name: qbittorrent
+    set:
+      qbittorrent:
+        config:
+          BitTorrent:
+            Session\DefaultSavePath: /downloads/it's
+    asserts:
+      - matchRegex:
+          path: data["apply-config.sh"]
+          pattern: "set_key 'BitTorrent' 'Session\\\\DefaultSavePath' '/downloads/it'\\\\''s'"

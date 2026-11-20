@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "qbittorrent.fullname" . }}
+  labels:
+    {{- include "qbittorrent.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "qbittorrent.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "qbittorrent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if .Values.qbittorrent.config }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "qbittorrent.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: WEBUI_PORT
+              value: {{ .Values.service.port | quote }}
+            - name: TORRENTING_PORT
+              value: {{ .Values.peerService.port | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+            - name: peer-tcp
+              containerPort: {{ .Values.peerService.port }}
+              protocol: TCP
+            - name: peer-udp
+              containerPort: {{ .Values.peerService.port }}
+              protocol: UDP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: qbittorrent-config
+              mountPath: /config
+            {{- if .Values.qbittorrent.config }}
+            - name: qbittorrent-init
+              mountPath: /custom-cont-init.d/50-apply-config.sh
+              subPath: apply-config.sh
+              readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        {{- if .Values.qbittorrent.config }}
+        - name: qbittorrent-init
+          configMap:
+            name: {{ include "qbittorrent.fullname" . }}-init
+            defaultMode: 0755
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: qbittorrent-config
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- with .Values.persistence.config.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.config.size }}
