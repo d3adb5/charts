@@ -141,6 +141,16 @@ entries:
   qbittorrent:
   - apiVersion: v2
     appVersion: 5.3.0
+    created: "2026-11-21T18:28:06.905457721Z"
+    description: A free and reliable P2P BitTorrent client
+    digest: 25e5583b5ab70cffe14a1f1c16e240f40023e1c303a5dfcee972a817202d2891
+    name: qbittorrent
+    type: application
+    urls:
+    - https://github.com/d3adb5/charts/releases/download/qbittorrent-0.2.0/qbittorrent-0.2.0.tgz
+    version: 0.2.0
+  - apiVersion: v2
+    appVersion: 5.3.0
     created: "2026-11-20T17:23:01.194194782Z"
     description: A free and reliable P2P BitTorrent client
     digest: cfa7ce8e627cefe4ef6c70a27462a4d60b80fffe13525a81708be1312e9b863d
@@ -227,4 +237,4 @@ entries:
     urls:
     - https://github.com/d3adb5/charts/releases/download/unpackerr-0.1.0/unpackerr-0.1.0.tgz
     version: 0.1.0
-generated: "2026-11-20T17:23:01.194227179Z"
+generated: "2026-11-21T18:28:06.90550568Z"
