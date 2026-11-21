@@ -60,6 +60,12 @@ spec:
           volumeMounts:
             - name: qbittorrent-config
               mountPath: /config
+            {{- if .Values.securityContext.readOnlyRootFilesystem }}
+            - name: run
+              mountPath: /run
+            - name: tmp
+              mountPath: /tmp
+            {{- end }}
             {{- if .Values.qbittorrent.config }}
             - name: qbittorrent-init
               mountPath: /custom-cont-init.d/50-apply-config.sh
@@ -70,6 +76,12 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       volumes:
+        {{- if .Values.securityContext.readOnlyRootFilesystem }}
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        {{- end }}
         {{- if .Values.qbittorrent.config }}
         - name: qbittorrent-init
           configMap:

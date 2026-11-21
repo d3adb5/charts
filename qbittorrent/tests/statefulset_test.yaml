@@ -88,3 +88,43 @@ tests:
     asserts:
       - notExists:
           path: spec.volumeClaimTemplates[0].spec.storageClassName
+
+  - it: gives a read-only root filesystem writable /run and /tmp
+    template: statefulset.yaml
+    release:
+      name: qbittorrent
+    set:
+      securityContext:
+        readOnlyRootFilesystem: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: run
+            mountPath: /run
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: run
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
+
+  - it: leaves /run and /tmp alone on a writable root filesystem
+    template: statefulset.yaml
+    release:
+      name: qbittorrent
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: run
+            mountPath: /run
